@@ -44,7 +44,23 @@ export interface Act {
   comedian: boolean;
   /** The act's photo from Qloo (images.qloo.com), when it has one. */
   image?: string;
+  /** Qloo doesn't know this act: everything about its fans is predicted from the acts named as like it. */
+  predicted?: boolean;
 }
+/** An act Qloo doesn't know yet, and the 2–3 acts in Qloo named as like it. */
+export interface NewAct {
+  name: string;
+  comedian: boolean;
+  /** Qloo IDs of the acts it's like. */
+  like: string[];
+}
+export const newAct = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    comedian: z.boolean().default(false),
+    like: z.array(qlooId).min(2).max(3),
+  })
+  .strict();
 /** A Qloo entity named in a plan (a brand, place, film, artist), with only what the plan shows. */
 export interface PlanEntity {
   id: string;
@@ -179,6 +195,8 @@ export interface PitchPack {
 }
 export interface PlanRequest {
   actId: string;
+  /** An act Qloo doesn't know (its actId is then from newActId), and the acts it's like. */
+  newAct?: NewAct;
   /** Where the tour goes. Absent on plans from before tours went worldwide: the United States. */
   where?: Where;
   homeCityId?: string;
@@ -187,6 +205,8 @@ export interface PlanRequest {
   /** Sponsor categories the act won't take (alcohol, say): their brands are left out. */
   avoid?: SponsorCategory[];
   excludeCityIds: string[];
+  /** Cities the tour must include, whatever their score. */
+  includeCityIds?: string[];
   /** Brands the act has turned down: never suggested again. */
   excludeBrandIds?: string[];
   focus: "balanced" | "hidden";
@@ -199,8 +219,11 @@ export interface Plan {
   createdAt: string;
   request: PlanRequest;
   act: Act;
-  /** Whose Qloo signal the plan uses: the act's own, or acts like it when the act's own data is thin. */
-  signal: { basis: "act" | "similar"; similar: PlanEntity[] };
+  /**
+   * Whose Qloo signal the plan uses: the act's own; acts like it, when the act's own data is thin; or, for an act Qloo
+   * doesn't know, the acts named as like it ("named", in `similar`).
+   */
+  signal: { basis: "act" | "similar" | "named"; similar: PlanEntity[] };
   fanDna: FanDNA;
   /** Qloo's heatmap for the real map: [latitude, longitude, weight 0–1], the stronger half of the cells. */
   heatPoints?: [number, number, number][];
@@ -209,6 +232,8 @@ export interface Plan {
   /** The candidate cities with data, strongest first (at most 80, and every stop). */
   cities: CityHeat[];
   route: RouteStop[];
+  /** The route against the area's biggest cities. Absent on plans made before it was worked out. */
+  proof?: Proof;
   sponsors: Sponsor[];
   supportActs: SupportAct[];
   localSpots: LocalSpot[];
@@ -217,6 +242,18 @@ export interface Plan {
   traces: TasteTrace[];
   durationMs: number;
   example?: boolean;
+}
+/**
+ * The proof that the route is worth more than the obvious one: its average Fan Heat against that of what a booker with
+ * no taste data would play, the area's biggest cities (as many as the route has stops), from the same Qloo heatmap.
+ */
+export interface Proof {
+  /** The route's average Fan Heat. */
+  route: number;
+  /** The biggest cities' average Fan Heat. */
+  biggest: number;
+  /** The biggest cities, biggest first, by name. */
+  biggestCities: string[];
 }
 /** A brand as Afinlo shows it, from Qloo: its picture, its Qloo brand genre tags. */
 export interface Brand extends PlanEntity {
@@ -289,6 +326,7 @@ export type TourStage =
   | { stage: "dna" }
   | { stage: "cities"; count: number }
   | { stage: "fallback"; similar: string[] }
+  | { stage: "predicting"; from: string[] }
   | { stage: "sponsors" }
   | { stage: "support" }
   | { stage: "scoring" }
@@ -298,6 +336,44 @@ export type TourStage =
   | { stage: "overlap"; count: number }
   | { stage: "pair"; a: string; b: string }
   | { stage: "route" };
+
+/** The tour manager's specialists. */
+export const SPECIALISTS = ["route", "venues", "sponsors", "promoter"] as const;
+export type Specialist = (typeof SPECIALISTS)[number];
+export const SPECIALIST_LABELS: Record<Specialist, string> = { route: "Route planner", venues: "Venue booker", sponsors: "Sponsor scout", promoter: "Promoter" };
+
+/** Something a specialist wrote for the user to send: a pitch to a brand, a hold request to a venue, a post for a city. */
+export interface AgentDraft {
+  type: "pitch" | "hold" | "post";
+  /** Who it's for, by name, and its ID in the tour (a brand, a venue, a city). */
+  to: string;
+  toId: string;
+  language: string;
+  subject?: string;
+  body: string;
+}
+/**
+ * What the tour manager's team did in a turn besides the reply: a change to the tour for the user to apply, a draft,
+ * a status set, a "no" remembered for the act's next tours.
+ */
+export type ManagerCard =
+  | { id: string; kind: "change"; summary: string; request: PlanRequest & { parentId: string } }
+  | { id: string; kind: "draft"; draft: AgentDraft }
+  | { id: string; kind: "status"; text: string; track: Omit<Track, "updatedAt"> }
+  | { id: string; kind: "memory"; text: string };
+/** A message in a tour's conversation with its manager, as the page shows it. */
+export interface ManagerMessage {
+  role: "user" | "assistant";
+  text: string;
+  /** The specialists the manager asked for this answer. */
+  agents?: Specialist[];
+  cards?: ManagerCard[];
+}
+/** What the tour manager is doing, as it happens: for the page to show while it works. */
+export type ManagerEvent =
+  | { kind: "ask"; agent: Specialist; task: string }
+  | { kind: "tool"; agent: Specialist | "manager"; label: string }
+  | { kind: "answered"; agent: Specialist };
 
 /** Where a sponsor pitch stands on a tour. */
 export const PITCH_STATUSES = ["to_send", "sent", "replied", "signed", "passed"] as const;
@@ -349,12 +425,14 @@ export type PairInput = z.input<typeof pairInput>;
 export const planInput = z
   .object({
     actId: qlooId,
+    newAct: newAct.optional(),
     where: where.default({ kind: "countries", countries: ["US"] }),
     homeCityId: cityId.optional(),
     stops: z.number().int().min(3).max(12).default(7),
     categories: z.array(sponsorCategory).max(3).default([]),
     avoid: z.array(sponsorCategory).max(8).default([]),
     excludeCityIds: z.array(cityId).max(20).default([]),
+    includeCityIds: z.array(cityId).max(6).optional(),
     excludeBrandIds: z.array(qlooId).max(40).default([]),
     focus: z.enum(["balanced", "hidden"]).default("balanced"),
     parentId: z.string().max(40).optional(),

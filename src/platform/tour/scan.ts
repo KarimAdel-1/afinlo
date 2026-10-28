@@ -1,20 +1,21 @@
 // The first look at an act's fans, worldwide: one Qloo heatmap for the whole world (its cells are about 150 km
 // across), scored on every city in the list, then summed up by country and by touring region. The brief opens
 // on it, so a manager picks where to tour from where the fans are. When Qloo has no map for the act, the acts with the
-// most overlapping audiences stand in, and the scan says so.
+// most overlapping audiences stand in, and the scan says so; for an act Qloo doesn't know, the acts named as like it.
 import type { TasteTrace } from "@/core/taste/types";
 import { countryName, REGIONS, type RegionId } from "@/core/tour/regions";
 import { heatPoints } from "@/core/tour/geo";
-import { scoreCities, WORLD_RADIUS_KM } from "@/core/tour/scoring";
-import { TourError, type Act, type CityHeat } from "@/core/tour/types";
+import { scoreCities } from "@/core/tour/scoring";
+import { newActOf } from "@/core/tour/named";
+import { TourError, type Act, type CityHeat, type NewAct } from "@/core/tour/types";
 import { WORLD_CITIES, WORLD_LOCATION } from "@/core/tour/world";
 import type { QlooClient } from "../taste/qloo";
-import { actById, qlooClient, heatCells, similarActs } from "./qloo";
+import { actById, qlooClient, heatCells, namedActs, similarActs } from "./qloo";
 
 export interface WorldScan {
   act: Act;
-  basis: "act" | "similar";
-  /** The acts standing in, when the act has no map of its own. */
+  basis: "act" | "similar" | "named";
+  /** The acts standing in, when the act has no map of its own, or the acts named as like an act Qloo doesn't know. */
   similar: string[];
   points: [number, number, number][];
   /** Countries by their fans: the mean Fan Heat of their three strongest cities. */
@@ -61,22 +62,29 @@ export function summarize(cities: CityHeat[]): Pick<WorldScan, "countries" | "re
   return { countries, regions };
 }
 
-export async function scanWorld(actId: string, deps: { client?: QlooClient; signal?: AbortSignal } = {}): Promise<WorldScan> {
+export async function scanWorld(input: { actId: string } | { newAct: NewAct }, deps: { client?: QlooClient; signal?: AbortSignal } = {}): Promise<WorldScan> {
   const client = deps.client ?? qlooClient();
   const traces: TasteTrace[] = [];
-  const act = await actById(client, actId, traces, deps.signal);
+  if ("newAct" in input) {
+    const named = await namedActs(client, input.newAct.like, traces, deps.signal);
+    if (!named) throw new TourError("act_missing", "Qloo doesn't know one of the acts you named. Search again and pick one of the matches.", 404);
+    const cells = await heatCells(client, named.map((a) => a.id), traces, deps.signal, WORLD_LOCATION).catch(() => []);
+    const cities = scoreCities(cells, { basis: "similar", cities: WORLD_CITIES, world: true });
+    return { act: newActOf(input.newAct), basis: "named", similar: named.map((a) => a.name), points: heatPoints(cells), ...summarize(cities), traces };
+  }
+  const act = await actById(client, input.actId, traces, deps.signal);
   if (!act) throw new TourError("act_missing", "Qloo doesn't know that act. Search again and pick one of the matches.", 404);
   let basis: WorldScan["basis"] = "act";
   let similar: string[] = [];
   let cells = await heatCells(client, [act.id], traces, deps.signal, WORLD_LOCATION).catch(() => []);
   if (!cells.length) {
-    const like = (await similarActs(client, act, traces, deps.signal).catch(() => [])).slice(0, 4);
+    const like = (await similarActs(client, [act.id], traces, deps.signal).catch(() => [])).slice(0, 4);
     if (like.length) {
       cells = await heatCells(client, [act.id, ...like.map((a) => a.id)], traces, deps.signal, WORLD_LOCATION).catch(() => []);
       basis = "similar";
       similar = like.map((a) => a.name);
     }
   }
-  const cities = scoreCities(cells, { basis, cities: WORLD_CITIES, radiusKm: WORLD_RADIUS_KM });
+  const cities = scoreCities(cells, { basis, cities: WORLD_CITIES, world: true });
   return { act, basis, similar, points: heatPoints(cells), ...summarize(cities), traces };
 }

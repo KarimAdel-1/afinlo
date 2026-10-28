@@ -16,13 +16,10 @@ export function km(a: { lat: number; lon: number }, b: { lat: number; lon: numbe
 
 /**
  * The stronger half of Qloo's cells as [latitude, longitude, weight 0–1]: Qloo's affinity is a rank across the area
- * (half the cells are above 0.5), so the weaker half would only grey the map. With the area's cities, only the cells
- * within 100 km of one: the heat a tour can use, not its neighbours' or the sea's.
+ * (half the cells are above 0.5), so the weaker half would only grey the map.
  */
-export function heatPoints(cells: HeatCell[], near?: { lat: number; lon: number }[]): [number, number, number][] {
-  const strong = cells.filter((c) => c.affinity >= 0.5);
-  const kept = near ? strong.filter((c) => near.some((p) => Math.abs(p.lat - c.lat) < 1 && km(p, c) <= 100)) : strong;
-  return kept.map((c) => [r2(c.lat), r2(c.lon), r2((c.affinity - 0.5) * 2)]);
+export function heatPoints(cells: HeatCell[]): [number, number, number][] {
+  return cells.filter((c) => c.affinity >= 0.5).map((c) => [r2(c.lat), r2(c.lon), r2((c.affinity - 0.5) * 2)]);
 }
 
 /** A plan keeps its strongest 80 cities with data (and every stop): enough to rank and swap, not the whole region. */

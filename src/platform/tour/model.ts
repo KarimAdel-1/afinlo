@@ -5,8 +5,35 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { setting } from "@/lib/settings";
 
-/** The model that writes the pitch pack, and the quicker one that reads a typed change. */
-export const MODELS = { writer: "gpt-6.1-sol", planner: "gpt-6-luna" } as const;
+/** A model call's model and how hard it reasons (OpenAI's reasoning effort). */
+export interface ModelChoice {
+  model: string;
+  effort: OpenAI.ReasoningEffort;
+}
+
+/**
+ * Every model call Afinlo makes, and the cheapest model and reasoning effort that does each job well. Qloo and plain
+ * code choose and score everything, so no job needs a large model: they're all GPT-6 Luna, and only the effort
+ * differs, with more for the text brands read.
+ */
+export const MODELS = {
+  /** The pitch pack for a new tour: the deck's text and the sponsor emails. */
+  writer: { model: "gpt-6-luna", effort: "medium" },
+  /** A typed change read into the tour's filters. */
+  planner: { model: "gpt-6-luna", effort: "low" },
+  /** The tour manager: which specialists to ask, and the reply from what they found. */
+  manager: { model: "gpt-6-luna", effort: "none" },
+  /** The route planner: explains the route from its numbers and turns a request into a change. */
+  route: { model: "gpt-6-luna", effort: "low" },
+  /** The venue booker: venues, statuses and hold requests. */
+  venues: { model: "gpt-6-luna", effort: "low" },
+  /** The sponsor scout: brands read its pitches, in any language. */
+  sponsors: { model: "gpt-6-luna", effort: "medium" },
+  /** The promoter: who the fans are, and posts for a city. */
+  promoter: { model: "gpt-6-luna", effort: "low" },
+  /** Folds a long conversation's older messages into a few lines. */
+  summary: { model: "gpt-6-luna", effort: "none" },
+} as const satisfies Record<string, ModelChoice>;
 
 /** Data text in a fenced block whose boundary its author can't predict (a hash of the text itself). */
 export function data(source: string, text: string) {
@@ -29,15 +56,15 @@ const objectIn = (text: string): unknown => {
 
 let client: OpenAI | undefined;
 
-/** One JSON answer from `model` that fits `schema`. */
-export async function askJson<T>(model: string, system: string, user: string, schema: z.ZodType<T>, name: string, options: { maxTokens: number; signal?: AbortSignal }): Promise<T> {
+/** One JSON answer that fits `schema`, from the model chosen for the job. */
+export async function askJson<T>(use: ModelChoice, system: string, user: string, schema: z.ZodType<T>, name: string, options: { maxTokens: number; signal?: AbortSignal }): Promise<T> {
   client ??= new OpenAI({ apiKey: setting("OPENAI_API_KEY") });
   const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
   delete jsonSchema.$schema;
   const ask = async (format: OpenAI.Responses.ResponseFormatTextConfig, instructions = system) =>
     (
       await client!.responses.create(
-        { model, instructions, input: user, reasoning: { effort: "low" }, max_output_tokens: options.maxTokens, text: { format }, store: false },
+        { model: use.model, instructions, input: user, reasoning: { effort: use.effort }, max_output_tokens: options.maxTokens, text: { format }, store: false },
         { signal: options.signal },
       )
     ).output_text;

@@ -1,5 +1,5 @@
 // Browser helpers for the app's own API.
-import type { TourStage, PlanInput } from "@/core/tour/types";
+import type { ManagerCard, ManagerEvent, PlanInput, Specialist, TourStage } from "@/core/tour/types";
 
 export async function postJson<T>(url: string, body: object): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -37,6 +37,28 @@ export async function streamRun(url: string, input: object, onStage: (s: TourSta
   }
 }
 
+/** A message to a tour's manager, reporting what the team does as it happens. Resolves with the reply and what it made. */
+export async function streamChat(planId: string, message: string, onEvent: (e: ManagerEvent) => void): Promise<{ reply: string; agents: Specialist[]; cards: ManagerCard[] }> {
+  const res = await fetch(`/api/tour/plan/${planId}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+  if (res.headers.get("content-type")?.includes("application/json")) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || "The team couldn't answer. Please try again.");
+  if (!res.ok || !res.body) throw new Error("The team couldn't start. Please try again.");
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += value ?? "";
+    const lines = buffer.split("\n");
+    buffer = done ? "" : lines.pop()!;
+    for (const line of lines.filter(Boolean)) {
+      const event = JSON.parse(line) as { event?: ManagerEvent; reply?: { reply: string; agents: Specialist[]; cards: ManagerCard[] }; error?: string };
+      if (event.event) onEvent(event.event);
+      if (event.error) throw new Error(event.error);
+      if (event.reply) return event.reply;
+    }
+    if (done) throw new Error("The connection closed before the team answered. Please try again.");
+  }
+}
+
 /** Starts a plan and reports each stage as the agent reaches it. Resolves with the plan's ID. */
 export const streamPlan = (input: PlanInput & { parentId?: string }, onStage: (s: TourStage) => void) => streamRun("/api/tour/plan", input, onStage);
 
@@ -48,6 +70,8 @@ export function stageLabel(s: TourStage): string {
       return `Scanning ${s.count} candidate cities with Qloo's heatmap`;
     case "fallback":
       return `Thin data for this act: estimating from acts like it (${s.similar.slice(0, 3).join(", ")})`;
+    case "predicting":
+      return `Not in Qloo yet: predicting from ${s.from.join(", ")}`;
     case "dna":
       return "Building the Fan DNA: taste, demographics, what fans love elsewhere";
     case "sponsors":

@@ -76,6 +76,17 @@
   font-size: 11px;
   color: var(--hl-subtle);
 }
+.deck-proof {
+  max-width: 230mm;
+  margin-top: 6mm !important;
+  font-size: 15px;
+  color: #2f3247;
+}
+.deck-proof b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 19px;
+  color: var(--hl-blue);
+}
 .deck-note {
   margin-top: auto !important;
   padding-bottom: 6mm;

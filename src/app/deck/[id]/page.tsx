@@ -159,9 +159,16 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
               </li>
             ))}
           </ol>
+          {plan.proof && (
+            <p className="deck-proof">
+              This route averages Fan Heat <b>{plan.proof.route}</b>. The {plan.proof.biggestCities.length} biggest cities in {plan.area ?? "the area"} average{" "}
+              <b>{plan.proof.biggest}</b>: {plan.proof.biggestCities.join(", ")}.
+            </p>
+          )}
           <p className="deck-note">
-            Fan Heat is where this audience over-indexes, from Qloo&apos;s heatmap: 100 is the act&apos;s strongest city. Hidden markets are strong cities outside the 10
-            largest US metros.
+            {plan.signal.basis === "named" && `Predicted: Qloo doesn't know ${plan.act.name} yet, so these are the fans of ${plan.signal.similar.map((a) => a.name).join(", ")}. `}
+            Fan Heat is where this audience over-indexes, from Qloo&apos;s heatmap: 100 is the act&apos;s strongest city. Hidden markets are strong cities outside the
+            area&apos;s biggest metros.
           </p>
           <PageFoot plan={plan} n={3} />
         </section>

@@ -59,21 +59,25 @@ export const regionId = z.enum(REGIONS.map((r) => r.id) as [RegionId, ...RegionI
 export const regionById = (id: RegionId) => REGIONS.find((r) => r.id === id)!;
 
 export const countryCode = z.string().refine((iso) => iso in COUNTRY_NAMES, "Afinlo doesn't have cities in that country.");
-/** Where a tour goes: a region, or a few countries. */
+/** Where a tour goes: a region, a few countries, or the whole world. */
 export const where = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("region"), region: regionId }).strict(),
   z.object({ kind: z.literal("countries"), countries: z.array(countryCode).min(1).max(8) }).strict(),
+  z.object({ kind: z.literal("world") }).strict(),
 ]);
 export type Where = z.infer<typeof where>;
 /** Plans from before tours went worldwide toured the United States. */
 export const US: Where = { kind: "countries", countries: ["US"] };
 
-export const countriesOf = (w: Where): string[] => (w.kind === "region" ? [...regionById(w.region).countries] : [...w.countries]);
-/** "North America", "the United Kingdom", "Germany and Austria". */
+export const WORLD: Where = { kind: "world" };
+
+export const countriesOf = (w: Where): string[] => (w.kind === "world" ? Object.keys(COUNTRY_NAMES) : w.kind === "region" ? [...regionById(w.region).countries] : [...w.countries]);
+/** "North America", "the United Kingdom", "Germany and Austria", "the world". */
 export function whereLabel(w: Where) {
+  if (w.kind === "world") return "the world";
   if (w.kind === "region") return regionById(w.region).label;
   const names = w.countries.map(countryName);
   return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 /** Two plans go to the same place: for reusing a plan made for the same request. */
-export const whereKey = (w: Where) => (w.kind === "region" ? `r:${w.region}` : `c:${[...w.countries].sort().join(",")}`);
+export const whereKey = (w: Where) => (w.kind === "world" ? "w" : w.kind === "region" ? `r:${w.region}` : `c:${[...w.countries].sort().join(",")}`);

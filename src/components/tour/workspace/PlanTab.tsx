@@ -56,6 +56,17 @@ export function PlanTab({
   return (
     <>
       <section className="hl-card hl-summary" aria-label="Where the fans are">
+        {plan.proof && (
+          <div className="hl-summary-proof">
+            <small>Against the biggest cities</small>
+            <b>
+              Fan Heat {plan.proof.route} vs {plan.proof.biggest}
+            </b>
+            <span>
+              This route&apos;s average, and that of the {plan.proof.biggestCities.length} biggest cities in {plan.area ?? "the area"}: {plan.proof.biggestCities.join(", ")}.
+            </span>
+          </div>
+        )}
         {top && (
           <div>
             <small>Strongest city</small>

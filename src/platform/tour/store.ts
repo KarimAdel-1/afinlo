@@ -44,7 +44,19 @@ export async function getPlan(id: string): Promise<Plan | undefined> {
 
 const sorted = (v?: string[]) => [...(v ?? [])].sort();
 const requestKey = (r: Plan["request"]) =>
-  JSON.stringify([r.actId, whereKey(r.where ?? US), r.homeCityId ?? "", r.stops, sorted(r.categories), sorted(r.avoid), sorted(r.excludeCityIds), sorted(r.excludeBrandIds), r.focus]);
+  JSON.stringify([
+    r.actId,
+    r.newAct ? [r.newAct.comedian, sorted(r.newAct.like)] : null,
+    whereKey(r.where ?? US),
+    r.homeCityId ?? "",
+    r.stops,
+    sorted(r.categories),
+    sorted(r.avoid),
+    sorted(r.excludeCityIds),
+    sorted(r.includeCityIds),
+    sorted(r.excludeBrandIds),
+    r.focus,
+  ]);
 
 /** A plan made for exactly this request in the last 24 hours, if any: reused instead of asking Qloo again. */
 export async function recentPlanFor(request: Plan["request"]): Promise<Plan | undefined> {
@@ -109,14 +121,14 @@ export async function exampleMatches<T>(kind: MatchKind): Promise<T[]> {
 }
 
 /** The newest example plan for each example act, for the one-click examples. */
-export async function examplePlans(): Promise<Pick<Plan, "id" | "act" | "cities" | "sponsors" | "route" | "heatPoints" | "area" | "traces">[]> {
+export async function examplePlans(): Promise<Pick<Plan, "id" | "act" | "cities" | "sponsors" | "route" | "proof" | "heatPoints" | "area" | "traces">[]> {
   const rows = await db()
     .prepare("SELECT DISTINCT ON (act_id) plan FROM tour_plans WHERE example = 1 ORDER BY act_id, created_at DESC")
     .all<{ plan: string }>();
   return rows
     .map((r) => JSON.parse(r.plan) as Plan)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map(({ id, act, cities, sponsors, route, heatPoints, area, traces }) => ({ id, act, cities, sponsors, route, heatPoints, area, traces }));
+    .map(({ id, act, cities, sponsors, route, proof, heatPoints, area, traces }) => ({ id, act, cities, sponsors, route, proof, heatPoints, area, traces }));
 }
 
 /**
@@ -137,5 +149,20 @@ export async function claimPlanSlot(visitor: string) {
     if ((hour?.n ?? 0) >= setting("HOURLY_PLANS"))
       throw new TourError("hourly_limit", "You've made several plans in the last hour. Please wait a little before the next one.", 429);
     await d.prepare("INSERT INTO tour_usage (visitor, created_at) VALUES (?, ?)").run(visitor, now());
+  });
+}
+
+/** A message to a tour's manager: limited like plans, per visitor per hour and for the whole server per day. */
+export async function claimChatSlot(visitor: string) {
+  return transaction(async (d) => {
+    await d.prepare("SELECT pg_advisory_xact_lock(hashtext('tour-chat-usage'))").get();
+    await d.prepare("DELETE FROM tour_chat_usage WHERE created_at < ?").run(new Date(Date.now() - DAY).toISOString());
+    const day = await d.prepare("SELECT COUNT(*) AS n FROM tour_chat_usage").get<{ n: number }>();
+    if ((day?.n ?? 0) >= setting("DAILY_CHAT")) throw new TourError("daily_chat_limit", "The tour team has answered all the messages it can today. Everything else still works; please try again tomorrow.", 429);
+    const hour = await d
+      .prepare("SELECT COUNT(*) AS n FROM tour_chat_usage WHERE visitor = ? AND created_at > ?")
+      .get<{ n: number }>(visitor, new Date(Date.now() - 3600_000).toISOString());
+    if ((hour?.n ?? 0) >= setting("HOURLY_CHAT")) throw new TourError("hourly_chat_limit", "You've sent the team a lot of messages in the last hour. Please wait a little.", 429);
+    await d.prepare("INSERT INTO tour_chat_usage (visitor, created_at) VALUES (?, ?)").run(visitor, now());
   });
 }

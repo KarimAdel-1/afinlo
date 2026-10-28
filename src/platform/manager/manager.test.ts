@@ -1,0 +1,244 @@
+// The tour manager and its team, with scripted models against the fixture Qloo: the manager hands work to the right
+// specialists (several at once when a message needs several), each sees only its task and answers from its tools,
+// a change is only a proposal, drafts are checked, statuses and "no"s are kept, the limits hold, and the conversation
+// is remembered, folded when long, and mended when a turn is cut short. Proves the orchestration, not the quality of a
+// real model's words.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { MemorySaver } from "@langchain/langgraph";
+import { isAIMessage, isHumanMessage, isToolMessage, type AIMessage, type BaseMessage } from "@langchain/core/messages";
+import type { ManagerEvent, Plan } from "@/core/tour/types";
+import { testBrowser, testDatabase } from "@/testing/database";
+import { ACT, fixtureQloo } from "@/testing/qloo";
+import { calls, ScriptedModel } from "@/testing/scripted";
+import { planTour } from "../tour/agent";
+import { actMemory, tracksFor } from "../tour/tracker";
+import { templatePitch } from "../tour/writer";
+import { askManager, managerHistory } from "./chat";
+import { LIMITS, type Role } from "./graph";
+import { TOOL_BUDGET } from "./tools";
+
+testDatabase();
+
+let made: Plan | undefined;
+/** The fixture act's tour, under an ID of the test's own. */
+async function tour(): Promise<Plan> {
+  made ??= await planTour({ actId: ACT, stops: 4 }, { client: fixtureQloo(), writer: async (f) => templatePitch(f) });
+  return { ...made, id: `pl_test_${Math.random().toString(36).slice(2, 10)}` };
+}
+
+async function ask(plan: Plan, message: string, scripts: Partial<Record<Role, ScriptedModel>>, options: { browser?: string; saver?: MemorySaver; signal?: AbortSignal } = {}) {
+  const events: ManagerEvent[] = [];
+  const out = await askManager(
+    { plan, browser: options.browser ?? testBrowser(), message, signal: options.signal ?? AbortSignal.timeout(30_000), emit: (e) => events.push(e) },
+    { models: (role) => scripts[role] ?? new ScriptedModel([], role), checkpointer: options.saver ?? new MemorySaver(), client: fixtureQloo() },
+  );
+  return { ...out, events };
+}
+const results = (messages: BaseMessage[]) => messages.filter((m) => isToolMessage(m)).map((m) => String(m.content));
+const system = (m: ScriptedModel, i: number) => String(m.calls.at(i)!.messages[0].content);
+const stopOf = (plan: Plan, i: number) => plan.cities.find((c) => c.id === plan.route[i].cityId)!;
+
+test("the manager hands a question to the right specialist, who answers from its tools; the reply keeps its words", async () => {
+  const plan = await tour();
+  const stop = stopOf(plan, 1);
+  const manager = new ScriptedModel(
+    [
+      calls(["ask_route_planner", { task: `Why is ${stop.name} on the route?` }]),
+      (messages) => {
+        assert.match(results(messages).join(), new RegExp(`${stop.name} is stop 2`));
+        return `${stop.name} is stop 2, with Fan Heat ${stop.heat}.`;
+      },
+    ],
+    "manager",
+  );
+  const route = new ScriptedModel(
+    [
+      calls(["city_details", { city: stop.name }]),
+      (messages) => {
+        const answer = results(messages).join();
+        assert.match(answer, /<data source="afinlo:city_details"/, "tool answers reach the model as fenced data");
+        assert.match(answer, /"why":"Stop 2, with Fan Heat/);
+        return `${stop.name} is stop 2, with Fan Heat ${stop.heat}.`;
+      },
+    ],
+    "route",
+  );
+  const out = await ask(plan, `Why ${stop.name}?`, { manager, route });
+  assert.equal(out.reply, `${stop.name} is stop 2, with Fan Heat ${stop.heat}.`);
+  assert.deepEqual(out.agents, ["route"]);
+  assert.deepEqual(out.cards, []);
+  // The specialist sees only its task: its own prompt, and the manager's words for it.
+  const first = route.calls[0].messages;
+  assert.equal(first.length, 2);
+  assert.match(String(first[0].content), /^You are the route planner/);
+  assert.equal(String(first[1].content), `Why is ${stop.name} on the route?`);
+  assert.match(system(manager, 0), /<data source="tour"/, "the tour reaches the manager as data");
+  assert.deepEqual(out.events.map((e) => e.kind), ["ask", "tool", "answered"]);
+  assert.equal(manager.left + route.left, 0);
+});
+
+test("a change is only a proposal: the route planner builds the next request, and the tour stays as it is", async () => {
+  const plan = await tour();
+  const skip = stopOf(plan, 2);
+  const manager = new ScriptedModel([
+    calls(["ask_route_planner", { task: `Make it 5 shows and skip ${skip.name}.` }]),
+    (messages) => {
+      assert.match(results(messages).join(), new RegExp(`Shown to the user below the reply: a change to apply \\(5 shows · skip ${skip.name}\\)`));
+      return "It's ready to apply below.";
+    },
+  ]);
+  const route = new ScriptedModel([
+    calls(["propose_change", { shows: 5, skip: ["Atlantis"] }]),
+    (messages) => {
+      assert.match(results(messages).at(-1)!, /^That didn't work: Atlantis isn't a candidate city/);
+      return calls(["propose_change", { shows: 5, skip: [skip.name] }]);
+    },
+    "Proposed: 5 shows, without it.",
+  ]);
+  const out = await ask(plan, `5 shows, no ${skip.name}`, { manager, route });
+  assert.equal(out.cards.length, 1);
+  const card = out.cards[0];
+  assert.ok(card.kind === "change");
+  assert.equal(card.summary, `5 shows · skip ${skip.name}`);
+  assert.equal(card.request.stops, 5);
+  assert.ok(card.request.excludeCityIds.includes(skip.id));
+  assert.equal(card.request.parentId, plan.id, "applied, it's a new version of this tour");
+  assert.equal(plan.request.stops, 4, "the tour itself didn't change");
+
+  // A city added next to a stop takes its place, and the proposal says so.
+  const stop = stopOf(plan, 0);
+  const near = { ...stop, id: "us-testville", name: "Testville", lat: stop.lat + 0.3 };
+  const again = await ask({ ...plan, cities: [...plan.cities, near] }, "Add Testville", {
+    manager: new ScriptedModel([calls(["ask_route_planner", { task: "Add Testville." }]), "Ready below."]),
+    route: new ScriptedModel([calls(["propose_change", { add: ["Testville"] }]), "Proposed."]),
+  });
+  const added = again.cards[0];
+  assert.ok(added?.kind === "change");
+  assert.equal(added.summary, `add Testville (${stop.name} makes way: shows stay 150 km apart)`);
+  assert.deepEqual(added.request.includeCityIds, ["us-testville"]);
+});
+
+test("a message that needs two specialists goes to both at once, and the manager replies from both", async () => {
+  const plan = await tour();
+  const manager = new ScriptedModel([
+    calls(["ask_sponsor_scout", { task: "Which sponsors fit best?" }], ["ask_promoter", { task: "Who are the fans?" }]),
+    (messages) => {
+      assert.equal(messages.filter((m) => isToolMessage(m)).length, 2);
+      return "Yee Yee Apparel fits best, and the fans are rowdy country fans.";
+    },
+  ]);
+  const sponsors = new ScriptedModel([calls(["sponsor_list", {}]), (m) => (assert.match(results(m).join(), /Yee Yee Apparel/), "Yee Yee Apparel fits best.")]);
+  const promoter = new ScriptedModel([calls(["fan_dna", {}]), (m) => (assert.match(results(m).join(), /Rowdy/), "Rowdy country fans.")]);
+  const out = await ask(plan, "Who should sponsor, and who are the fans?", { manager, sponsors, promoter });
+  assert.deepEqual([...out.agents].sort(), ["promoter", "sponsors"]);
+  assert.equal(out.events.filter((e) => e.kind === "ask").length, 2);
+});
+
+test("drafts are checked: a money figure is refused and rewritten, and the saved draft is the user's to send", async () => {
+  const plan = await tour();
+  const brand = plan.sponsors[0].brand;
+  const manager = new ScriptedModel([calls(["ask_sponsor_scout", { task: `Write the ${brand.name} pitch in Spanish.` }]), "The pitch is below."]);
+  const sponsors = new ScriptedModel([
+    calls(["save_draft", { to: brand.name, language: "Spanish", subject: "Gira", body: "Hola, ofrecemos un paquete de $50,000 para la gira de Fixture Star." }]),
+    (m) => {
+      assert.match(results(m).at(-1)!, /Refused: it has a money figure or percentage/);
+      return calls(["save_draft", { to: "Nike", language: "Spanish", subject: "Gira", body: "Hola equipo de alianzas, hablemos de la gira." }]);
+    },
+    (m) => {
+      assert.match(results(m).at(-1)!, /Nike isn't one of this tour's brands/);
+      return calls(["save_draft", { to: brand.name, language: "Spanish", subject: "La gira de Fixture Star", body: "Hola equipo de alianzas: los fans de Fixture Star aman su marca. ¿Hablamos?" }]);
+    },
+    "Saved the Spanish pitch.",
+  ]);
+  const out = await ask(plan, `Pitch ${brand.name} in Spanish`, { manager, sponsors });
+  assert.equal(out.cards.length, 1);
+  const card = out.cards[0];
+  assert.ok(card.kind === "draft");
+  assert.deepEqual([card.draft.type, card.draft.toId, card.draft.language], ["pitch", brand.id, "Spanish"]);
+  assert.doesNotMatch(card.draft.body, /\$/);
+});
+
+test("statuses and no's last: a pitch's status is set on the tour, and a no is remembered for the act's next tours", async () => {
+  const plan = await tour();
+  const browser = testBrowser();
+  const sponsor = plan.sponsors[0];
+  const manager = new ScriptedModel([calls(["remember_no", { kind: "category", name: "alcohol" }], ["ask_sponsor_scout", { task: `Mark the ${sponsor.brand.name} pitch as sent.` }]), "Done."]);
+  const sponsors = new ScriptedModel([calls(["set_sponsor_status", { brand: sponsor.brand.name, status: "sent" }]), "Marked as sent."]);
+  const out = await ask(plan, `Never alcohol. I sent ${sponsor.brand.name}.`, { manager, sponsors }, { browser });
+  const tracks = (await tracksFor(browser, [plan.id])).get(plan.id)!;
+  assert.equal(tracks.find((t) => t.itemId === sponsor.brand.id)?.status, "sent");
+  assert.deepEqual((await actMemory(browser, plan.act.id))?.avoid, ["alcohol"]);
+  assert.deepEqual(out.cards.map((c) => c.kind).sort(), ["memory", "status"]);
+});
+
+test("the limits hold: the team's lookups run out, a specialist's last step and the manager's last round can't call tools", async () => {
+  const plan = await tour();
+  const four = Array.from({ length: 4 }, () => ["route_overview", {}] as [string, Record<string, unknown>]);
+  const route = new ScriptedModel([
+    calls(...four),
+    calls(...four),
+    calls(...four),
+    (m) => {
+      assert.equal(results(m).filter((r) => /used this message's lookups/.test(r)).length, 12 - TOOL_BUDGET);
+      return "Here's the route.";
+    },
+  ]);
+  await ask(plan, "The route?", { manager: new ScriptedModel([calls(["ask_route_planner", { task: "Give the route." }]), "Here."]), route });
+  assert.equal(route.calls.length, LIMITS.steps);
+  assert.equal(route.calls.at(-1)!.toolChoice, "none", "its last step can't call tools");
+  assert.match(system(route, -1), /answer now/);
+
+  const manager = new ScriptedModel([...Array.from({ length: LIMITS.rounds }, () => calls(["act_memory", {}])), "Finally, the reply."]);
+  const out = await ask(plan, "Remember anything?", { manager });
+  assert.equal(out.reply, "Finally, the reply.");
+  assert.equal(manager.calls.at(-1)!.toolChoice, "none");
+  assert.match(system(manager, -1), /reply to the user now/);
+});
+
+test("the conversation is remembered across messages, and older turns fold into a summary once it's long", async () => {
+  const plan = await tour();
+  const browser = testBrowser();
+  const saver = new MemorySaver();
+  for (let i = 1; i <= LIMITS.foldAt; i++)
+    await ask(plan, `Message ${i}`, { manager: new ScriptedModel([(m) => (i > 1 && assert.ok(m.some((x) => x.content === `Reply ${i - 1}`), "the last reply is remembered"), `Reply ${i}`)]) }, { browser, saver });
+  const summary = new ScriptedModel([(m) => (assert.match(String(m.at(-1)!.content), /User: Message 1\n/), "The user asked ten things.")]);
+  const manager = new ScriptedModel([
+    (m) => {
+      assert.equal(m.filter((x) => isHumanMessage(x)).length, LIMITS.keep, "only the latest turns, word for word");
+      assert.match(String(m[0].content), /The user asked ten things\./, "and the summary of the rest");
+      return "Reply 11";
+    },
+  ]);
+  await ask(plan, "Message 11", { manager, summary }, { browser, saver });
+  const history = await managerHistory(plan, browser, { checkpointer: saver });
+  assert.equal(history.summary, "The user asked ten things.");
+  assert.deepEqual(
+    history.messages.filter((m) => m.role === "user").map((m) => m.text),
+    Array.from({ length: LIMITS.keep }, (_, i) => `Message ${11 - LIMITS.keep + 1 + i}`),
+  );
+  assert.equal(history.messages.at(-1)!.text, "Reply 11");
+});
+
+test("a turn cut short leaves no broken messages: its unanswered handoffs are dropped before the next turn", async () => {
+  const plan = await tour();
+  const browser = testBrowser();
+  const saver = new MemorySaver();
+  const stop = new AbortController();
+  const route = new ScriptedModel([
+    () => {
+      stop.abort();
+      throw new Error("The user left.");
+    },
+  ]);
+  await assert.rejects(ask(plan, "Plan it all.", { manager: new ScriptedModel([calls(["ask_route_planner", { task: "Everything." }])]), route }, { browser, saver, signal: stop.signal }));
+  const manager = new ScriptedModel([
+    (m) => {
+      const answered = new Set(m.flatMap((x) => (isToolMessage(x) ? [x.tool_call_id] : [])));
+      assert.ok(m.every((x) => !isAIMessage(x) || ((x as AIMessage).tool_calls ?? []).every((c) => answered.has(c.id!))), "no tool call is left unanswered");
+      return "Back again.";
+    },
+  ]);
+  const out = await ask(plan, "Are you there?", { manager }, { browser, saver });
+  assert.equal(out.reply, "Back again.");
+});

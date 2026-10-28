@@ -10,7 +10,7 @@ import { savedResults } from "@/platform/tour/saved";
 import { getPlan } from "@/platform/tour/store";
 import { actMemory, tourOf, tracksFor } from "@/platform/tour/tracker";
 
-const TABS: Tab[] = ["plan", "book", "fund", "promote", "next"];
+const TABS: Tab[] = ["plan", "team", "book", "fund", "promote", "next"];
 
 export async function generateMetadata({ params }: PageProps<"/tour/[id]">): Promise<Metadata> {
   const plan = await getPlan((await params).id);

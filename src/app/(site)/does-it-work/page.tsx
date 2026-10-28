@@ -121,6 +121,11 @@ export default async function DoesItWork() {
                   </span>
                 </b>
                 <StaticMap points={e.heatPoints} stops={planStops(e)} width={420} height={270} numbered={false} label={`${e.act.name}'s tour of ${e.area ?? "the United States"}, over Qloo's heatmap`} />
+                {e.proof && (
+                  <small>
+                    Fan Heat {e.proof.route} on the route · {e.proof.biggest} in the {e.proof.biggestCities.length} biggest cities
+                  </small>
+                )}
               </Link>
             ))}
           </div>

@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MapLibre, Marker, Popup } from "maplibre-gl";
+
+/** A paint property's name, as MapLibre types them. */
+type PaintProperty = Parameters<MapLibre["setPaintProperty"]>[1];
 import "maplibre-gl/dist/maplibre-gl.css";
 import { arc } from "@/core/tour/geo";
+import { heatGrid, heatLevels, heatPaint, heatSpots } from "@/core/tour/heat";
 
 /** A stop on the route, in order. `leg` is how it's reached from the stop before (or from home). */
 export interface MapStop {
@@ -45,7 +49,6 @@ export function TourMap({
   focus,
   label,
   interactive = true,
-  coarse = false,
 }: {
   points?: [number, number, number][];
   stops?: MapStop[];
@@ -60,8 +63,6 @@ export function TourMap({
   focus?: { lat: number; lon: number; zoom?: number };
   label: string;
   interactive?: boolean;
-  /** The world view's cells are about 150 km across: each point spreads wider. */
-  coarse?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre | null>(null);
@@ -84,6 +85,8 @@ export function TourMap({
     void (async () => {
       try {
         const maplibre = await import("maplibre-gl");
+        // MapLibre finds its worker next to its own file, which the bundle moves: the bundle serves the worker too.
+        maplibre.setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).href);
         if (cancelled || !box.current) return;
         lib.current = maplibre;
         const m = new maplibre.Map({
@@ -125,48 +128,24 @@ export function TourMap({
     };
   }, [interactive]);
 
-  // The heat layer.
+  // The heat layer: Qloo's cells blurred into a field sized to their grid, on a scale anchored at the hottest places (heat.ts).
   useEffect(() => {
     const m = map.current;
     if (state !== "ready" || !m) return;
-    const data = { type: "FeatureCollection" as const, features: points.map(([lat, lon, w]) => ({ type: "Feature" as const, properties: { w }, geometry: { type: "Point" as const, coordinates: [lon, lat] } })) };
+    const grid = heatGrid(points);
+    const data = {
+      type: "FeatureCollection" as const,
+      features: heatSpots(points, grid).map(([lat, lon, density, stretch]) => ({ type: "Feature" as const, properties: { density, stretch }, geometry: { type: "Point" as const, coordinates: [lon, lat] } })),
+    };
+    const paint = heatPaint(grid, heatLevels(points, grid));
     const source = m.getSource("heat") as GeoJSONSource | undefined;
-    if (source) source.setData(data);
-    else {
+    if (source) {
+      void source.setData(data);
+      for (const [name, value] of Object.entries(paint)) m.setPaintProperty("heat", name as PaintProperty, value as never);
+    } else {
       m.addSource("heat", { type: "geojson", data });
-      m.addLayer(
-        {
-          id: "heat",
-          type: "heatmap",
-          source: "heat",
-          paint: {
-            "heatmap-weight": ["*", ["get", "w"], ["get", "w"]],
-            "heatmap-intensity": coarse ? ["interpolate", ["linear"], ["zoom"], 0, 1.4, 4, 2.2, 7, 3] : ["interpolate", ["linear"], ["zoom"], 0, 0.7, 5, 1.2, 9, 2],
-            "heatmap-radius": coarse ? ["interpolate", ["linear"], ["zoom"], 0, 9, 3, 24, 5, 48, 7, 90] : ["interpolate", ["linear"], ["zoom"], 0, 5, 3, 12, 5, 22, 8, 36, 11, 60],
-            "heatmap-color": [
-              "interpolate",
-              ["linear"],
-              ["heatmap-density"],
-              0,
-              "rgba(143,134,255,0)",
-              0.12,
-              "rgba(143,134,255,0.32)",
-              0.35,
-              "rgba(98,86,255,0.5)",
-              0.6,
-              "rgba(67,54,255,0.62)",
-              0.82,
-              "rgba(190,70,220,0.7)",
-              1,
-              "rgba(255,79,126,0.82)",
-            ],
-            "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 9, 0.9, 13, 0.35],
-          },
-        },
-        firstLabel(m),
-      );
+      m.addLayer({ id: "heat", type: "heatmap", source: "heat", paint } as Parameters<MapLibre["addLayer"]>[0], firstLabel(m));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- coarse is fixed for a map
   }, [state, points]);
 
   // The route and its stops.
@@ -183,7 +162,7 @@ export function TourMap({
     });
     const data = { type: "FeatureCollection" as const, features: legs };
     const source = m.getSource("route") as GeoJSONSource | undefined;
-    if (source) source.setData(data);
+    if (source) void source.setData(data);
     else {
       m.addSource("route", { type: "geojson", data });
       m.addLayer({ id: "route-casing", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": 6, "line-opacity": 0.9 } });
@@ -301,10 +280,10 @@ export function TourMap({
 
 /** The basemap in Afinlo's colours: a pale canvas, lavender water, quiet labels. */
 function tune(m: MapLibre) {
-  const set = (layer: string, prop: string, value: unknown) => {
+  const set = (layer: string, prop: PaintProperty, value: unknown) => {
     if (!m.getLayer(layer)) return;
     try {
-      m.setPaintProperty(layer, prop, value);
+      m.setPaintProperty(layer, prop, value as never);
     } catch {
       // A layer this style doesn't have in that form: leave it.
     }

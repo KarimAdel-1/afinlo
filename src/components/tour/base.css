@@ -1647,6 +1647,12 @@
   font-size: 20px;
   letter-spacing: -0.03em;
 }
+.hl-minimap > small {
+  display: block;
+  margin: 12px 6px 2px;
+  font-size: 14px;
+  color: var(--hl-muted);
+}
 .hl-minimap > b span {
   display: inline-flex;
   align-items: center;

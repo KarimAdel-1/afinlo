@@ -5,8 +5,9 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import type { TasteTrace } from "@/core/taste/types";
 import { whereLabel, type Where } from "@/core/tour/regions";
-import { planRoute, scoreCities, scoreSponsors, strongestIn, type BrandResult, type HeatCell } from "@/core/tour/scoring";
-import { citiesIn, locationOf } from "@/core/tour/world";
+import { planRoute, proofOf, routeRules, scoreCities, scoreSponsors, strongestIn, type BrandResult, type HeatCell } from "@/core/tour/scoring";
+import { newActId, newActOf } from "@/core/tour/named";
+import { cellsIn, citiesIn, locationOf } from "@/core/tour/world";
 import {
   TourError,
   planInput,
@@ -20,11 +21,12 @@ import {
   type PlanEntity,
   type PlanInput,
   type PlanRequest,
+  type Proof,
   type Sponsor,
   type SupportAct,
 } from "@/core/tour/types";
 import type { QlooClient } from "../taste/qloo";
-import { actById, audienceTags, brands as qlooBrands, demographics, qlooClient, heatCells, loves, placesNear, sharedTags, similarActs, TRANSPORT, VENUE_TAGS } from "./qloo";
+import { actById, audienceTags, brands as qlooBrands, demographics, qlooClient, heatCells, loves, namedActs, placesNear, sharedTags, similarActs, TRANSPORT, VENUE_TAGS } from "./qloo";
 import { heatPoints, keepCities } from "@/core/tour/geo";
 import { newPlanId } from "./store";
 import { defaultWriter, type Writer } from "./writer";
@@ -33,7 +35,9 @@ const replace = <T>(fallback: () => T) => Annotation<T>({ reducer: (_old: T, nex
 const State = Annotation.Root({
   request: replace<PlanRequest>(() => ({ actId: "", stops: 7, categories: [], excludeCityIds: [], focus: "balanced" })),
   act: replace<Act | undefined>(() => undefined),
-  basis: replace<"act" | "similar">(() => "act"),
+  /** For an act Qloo doesn't know, the acts named as like it. */
+  named: replace<Act[]>(() => []),
+  basis: replace<Plan["signal"]["basis"]>(() => "act"),
   similar: replace<(PlanEntity & { affinity: number; comedian: boolean })[]>(() => []),
   signalIds: replace<string[]>(() => []),
   cells: replace<HeatCell[]>(() => []),
@@ -42,6 +46,7 @@ const State = Annotation.Root({
   supportActs: replace<SupportAct[]>(() => []),
   cities: replace<CityHeat[]>(() => []),
   route: replace<Plan["route"]>(() => []),
+  proof: replace<Proof | undefined>(() => undefined),
   sponsors: replace<Sponsor[]>(() => []),
   localSpots: replace<LocalSpot[]>(() => []),
   pitch: replace<Plan["pitch"] | undefined>(() => undefined),
@@ -50,6 +55,14 @@ const State = Annotation.Root({
 type S = typeof State.State;
 /** The act together with the three acts whose audiences overlap most: the fallback signal. */
 const wideSignal = (s: S) => [...new Set([...s.signalIds, ...s.similar.slice(0, 3).map((p) => p.id)])];
+/** Whose Qloo data the plan is from, as the plan and the writer show it: the acts standing in, or the acts named. */
+const signalOf = (s: S): Plan["signal"] => ({
+  basis: s.basis,
+  similar:
+    s.basis === "named"
+      ? s.named.map(({ id, name, kind, disambiguation, popularity, image }) => ({ id, name, type: kind, disambiguation: disambiguation || undefined, popularity, image }))
+      : s.similar.slice(0, 4).map(({ id, name, type, disambiguation, popularity, image }) => ({ id, name, type, disambiguation, popularity, image })),
+});
 
 export interface AgentDeps {
   client?: QlooClient;
@@ -63,13 +76,16 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
   const started = Date.now();
   const parsed = planInput.parse(input);
   const request: PlanRequest = {
-    actId: parsed.actId,
+    // An act Qloo doesn't know is known by its name, so its memory carries from tour to tour.
+    actId: parsed.newAct ? newActId(parsed.newAct.name) : parsed.actId,
+    newAct: parsed.newAct,
     where: parsed.where,
     homeCityId: parsed.homeCityId,
     stops: parsed.stops,
     categories: parsed.categories,
     avoid: parsed.avoid,
     excludeCityIds: parsed.excludeCityIds,
+    includeCityIds: parsed.includeCityIds,
     excludeBrandIds: parsed.excludeBrandIds,
     focus: parsed.focus,
   };
@@ -85,16 +101,37 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
   const traces: TasteTrace[] = [];
 
   const resolve = async (s: S): Promise<Partial<S>> => {
+    if (s.request.newAct) {
+      const named = await namedActs(client, s.request.newAct.like, traces, signal);
+      if (!named) throw new TourError("act_missing", "Qloo doesn't know one of the acts you named. Search again and pick one of the matches.", 404);
+      const act = newActOf(s.request.newAct);
+      stage({ stage: "resolving", act: act.name });
+      return { act, named };
+    }
     const act = await actById(client, s.request.actId, traces, signal);
     if (!act) throw new TourError("act_missing", "Qloo doesn't know that act. Search again and pick one of the matches.", 404);
     stage({ stage: "resolving", act: act.name });
     return { act };
   };
 
-  // The act's own heatmap; if Qloo has none, a combined signal from the acts whose audiences overlap most.
+  // The act's own heatmap; if Qloo has none, a combined signal from the acts whose audiences overlap most. An act Qloo
+  // doesn't know has only the acts named as like it.
   const readSignal = async (s: S): Promise<Partial<S>> => {
     const act = s.act!;
     stage({ stage: "cities", count: candidates.length });
+    if (s.named.length) {
+      const ids = s.named.map((a) => a.id);
+      stage({ stage: "predicting", from: s.named.map((a) => a.name) });
+      const [cells, similar] = await Promise.all([
+        heatCells(client, ids, traces, signal, location).catch((error) => {
+          if (signal?.aborted) throw error;
+          return [];
+        }),
+        similarActs(client, ids, traces, signal).catch(() => []),
+      ]);
+      const names = s.named.map((a) => a.name).join(", ");
+      return { cells, signalIds: ids, similar, basis: "named", notes: [`Qloo doesn't know ${act.name} yet, so everything here is predicted from the acts named as like it: ${names}.`] };
+    }
     let own: HeatCell[] = [];
     const notes: string[] = [];
     try {
@@ -103,7 +140,7 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
       if (signal?.aborted) throw error;
       notes.push(`Qloo's location data didn't answer for ${act.name}.`);
     }
-    const similar = await similarActs(client, act, traces, signal).catch(() => []);
+    const similar = await similarActs(client, [act.id], traces, signal).catch(() => []);
     if (own.length) return { cells: own, signalIds: [act.id], similar, basis: "act", notes };
     const proxies = similar.slice(0, 4);
     if (!proxies.length) return { cells: [], signalIds: [act.id], similar, basis: "act", notes };
@@ -167,24 +204,38 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
     const smaller = s.similar.filter((a) => a.popularity === undefined || s.act!.popularity === undefined || a.popularity <= s.act!.popularity + 0.001);
     const comics = smaller.filter((a) => a.comedian);
     const pool = (s.act!.comedian && comics.length >= 2 ? comics : smaller).slice(0, 4);
-    const shared = await Promise.all(pool.map((a) => sharedTags(client, s.act!.id, a.id, traces, signal).catch(() => [])));
+    // An act Qloo doesn't know is compared through the acts named as like it.
+    const me = s.basis === "named" ? s.signalIds.join(",") : s.act!.id;
+    const shared = await Promise.all(pool.map((a) => sharedTags(client, me, a.id, traces, signal).catch(() => [])));
     return { supportActs: pool.map((a, i) => ({ act: { id: a.id, name: a.name, type: a.type, disambiguation: a.disambiguation, popularity: a.popularity, image: a.image }, affinity: a.affinity, shared: shared[i] })) };
   };
 
   const score = async (s: S): Promise<Partial<S>> => {
     stage({ stage: "scoring" });
-    const cities = scoreCities(s.cells, { basis: s.basis, cities: candidates });
-    const route = planRoute(cities, { stops: s.request.stops, homeCityId: s.request.homeCityId, excludeCityIds: s.request.excludeCityIds, focus: s.request.focus });
+    // Fan Heat from other acts' fans is never high confidence, whether Qloo or the user chose the acts.
+    const basis = s.basis === "act" ? "act" : "similar";
+    // A world tour reads Qloo's coarser world cells its own way, and spreads its shows across countries.
+    const rules = routeRules(area, s.request.stops);
+    const cities = scoreCities(s.cells, { basis, cities: candidates, world: area.kind === "world" });
+    const route = planRoute(cities, {
+      gapKm: rules.gapKm,
+      perCountry: rules.perCountry,
+      stops: s.request.stops,
+      homeCityId: s.request.homeCityId,
+      excludeCityIds: s.request.excludeCityIds,
+      includeCityIds: s.request.includeCityIds,
+      focus: s.request.focus,
+    });
     const scored = scoreSponsors(s.brands, {
       categoryTags: s.request.categories.map((c) => SPONSOR_CATEGORIES[c].tag),
       avoidTags: (s.request.avoid ?? []).map((c) => SPONSOR_CATEGORIES[c].tag),
       excludeBrandIds: s.request.excludeBrandIds,
-      basis: s.basis,
+      basis,
     });
     const notes: string[] = [];
     if (!cities.length) notes.push(`Qloo has no location data for ${s.act!.name} or acts like it in ${whereLabel(area)} yet, so Afinlo can't say where the fans are there. It won't guess.`);
     if (!scored.length) notes.push(s.request.categories.length ? "No brands in those categories came back for this audience. Try other categories." : "Qloo returned no brands for this audience.");
-    return { cities, route, sponsors: scored.map((x) => ({ ...x, strongestIn: [] })), notes };
+    return { cities, route, proof: proofOf(cities, route), sponsors: scored.map((x) => ({ ...x, strongestIn: [] })), notes };
   };
 
   // For the route's top cities: venues and spots fans love; for the top sponsors: where the brand's own audience is
@@ -209,7 +260,7 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
     await Promise.all(
       sponsors.slice(0, 4).map(async (sp, i) => {
         const cells = await heatCells(client, [sp.brand.id], traces, signal, location).catch(() => []);
-        sponsors[i] = { ...sp, strongestIn: strongestIn(cells, routeCities) };
+        sponsors[i] = { ...sp, strongestIn: strongestIn(cells, routeCities, area.kind === "world") };
       }),
     );
     return { localSpots: spots, sponsors };
@@ -219,7 +270,7 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
     stage({ stage: "writing" });
     const routeCities = s.route.map((r) => s.cities.find((c) => c.id === r.cityId)!).filter(Boolean);
     const pitch = await writer(
-      { act: s.act!, fanDna: s.fanDna, sponsors: s.sponsors, supportActs: s.supportActs, signal: { basis: s.basis, similar: s.similar.slice(0, 4) }, route: routeCities, stops: s.request.stops },
+      { act: s.act!, fanDna: s.fanDna, sponsors: s.sponsors, supportActs: s.supportActs, signal: signalOf(s), route: routeCities, stops: s.request.stops },
       signal,
     );
     return { pitch };
@@ -252,12 +303,13 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
     createdAt: new Date().toISOString(),
     request,
     act: s.act!,
-    signal: { basis: s.basis, similar: s.similar.slice(0, 4).map(({ id, name, type, disambiguation, popularity, image }) => ({ id, name, type, disambiguation, popularity, image })) },
+    signal: signalOf(s),
     fanDna: s.fanDna,
-    heatPoints: heatPoints(s.cells, candidates),
+    heatPoints: heatPoints(cellsIn(s.cells, area)),
     area: whereLabel(area),
     cities: keepCities(s.cities, s.route),
     route: s.route,
+    proof: s.proof,
     sponsors: s.sponsors.slice(0, 12),
     supportActs: s.supportActs,
     localSpots: s.localSpots,

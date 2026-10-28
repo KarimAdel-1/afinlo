@@ -23,7 +23,9 @@ export function useTracks(planId: string, initial: Track[]) {
       setError(((await res?.json().catch(() => ({}))) as { error?: string } | undefined)?.error ?? "That didn't save. Please try again.");
     }
   };
-  return { tracks, statusOf, set, error };
+  /** A status already saved elsewhere (by the tour team): shown, not saved again. */
+  const saved = (t: Omit<Track, "updatedAt">) => setTracks((v) => [...v.filter((x) => !(x.kind === t.kind && x.itemId === t.itemId)), { ...t, updatedAt: new Date().toISOString() }]);
+  return { tracks, statusOf, set, saved, error };
 }
 
 export type GuideState = { status: "loading" } | { status: "ready"; guide: Omit<CityGuide, "traces"> & { requests: number } } | { status: "error"; error: string };

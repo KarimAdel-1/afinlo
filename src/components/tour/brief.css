@@ -101,6 +101,10 @@
 .hl-chip-button:hover {
   border-color: var(--hl-ink);
 }
+.hl-chip-button svg {
+  vertical-align: -2px;
+  margin-left: 4px;
+}
 .hl-brief .hl-results {
   margin-top: 16px;
 }
@@ -154,6 +158,9 @@
   color: var(--hl-ink);
   text-align: left;
   transition: border-color 0.15s, box-shadow 0.15s;
+}
+.hl-region-globe {
+  color: var(--hl-blue);
 }
 .hl-regions button:hover {
   border-color: #c9c5ff;

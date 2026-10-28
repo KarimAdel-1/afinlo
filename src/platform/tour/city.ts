@@ -2,6 +2,7 @@
 // night (bars, breweries, restaurants, clothing stores), and other places fans love there. Qloo picks every place;
 // nothing is written by a model. Made once per stop, then kept with the plan (store.ts).
 import type { TasteTrace } from "@/core/taste/types";
+import { signalIdsOf } from "@/core/tour/named";
 import { TourError, type CityGuide, type CityPlace, type Plan } from "@/core/tour/types";
 import type { QlooClient } from "../taste/qloo";
 import { qlooClient, LEAD_TAGS, NOT_PUBLIC, placesNear, TRANSPORT, VENUE_FALLBACK_TAGS, VENUE_TAGS } from "./qloo";
@@ -11,8 +12,8 @@ export async function makeCityGuide(plan: Plan, cityId: string, deps: { client?:
   if (!city) throw new TourError("not_on_route", "That city isn't on this tour.", 404);
   const client = deps.client ?? qlooClient();
   const traces: TasteTrace[] = [];
-  // The same signal the plan used: the act's own, or the act with the acts like it when its own data is thin.
-  const ids = plan.signal.basis === "similar" ? [plan.act.id, ...plan.signal.similar.map((s) => s.id)] : [plan.act.id];
+  // The same signal the plan used.
+  const ids = signalIdsOf(plan);
   const ask = (tag: string | undefined, take: number) => placesNear(client, ids, city, { tag, take }, traces, deps.signal);
   const answers = await Promise.allSettled([
     ask(plan.act.comedian ? VENUE_TAGS.comedy : VENUE_TAGS.music, 6),

@@ -30,6 +30,51 @@ export function citiesIn(w: Where) {
   return WORLD_CITIES.filter((c) => set.has(c.country));
 }
 
+let bands: Map<number, WorldCity[]> | undefined;
+/** The candidate city nearest a point, anywhere in the world, and how far it is. */
+export function nearestCity(p: { lat: number; lon: number }): { city: WorldCity; km: number } {
+  if (!bands) {
+    bands = new Map();
+    for (const c of WORLD_CITIES) {
+      const b = Math.floor(c.lat);
+      const list = bands.get(b);
+      if (list) list.push(c);
+      else bands.set(b, [c]);
+    }
+  }
+  let city = WORLD_CITIES[0],
+    best = Infinity;
+  // Bands of latitude outward from the point's own: one `ring` degrees off is at least (ring - 1) × 111 km away.
+  for (let ring = 0, home = Math.floor(p.lat); ring <= 180 && (ring - 1) * 111 <= best; ring++)
+    for (const b of ring ? [home - ring, home + ring] : [home])
+      for (const c of bands.get(b) ?? []) {
+        const d = km(p, c);
+        if (d < best) {
+          best = d;
+          city = c;
+        }
+      }
+  return { city, km: best };
+}
+
+/** Past this far from any city, a cell is a remote island or open land no tour reaches. */
+const REACH_KM = 500;
+
+/** The country a point of Qloo's map is in: its nearest city's. None for a remote island or open land. */
+export function countryAt(p: { lat: number; lon: number }): string | undefined {
+  const { city, km } = nearestCity(p);
+  return km <= REACH_KM ? city.country : undefined;
+}
+
+/**
+ * Qloo's cells inside an area. A cell belongs to the country of its nearest city, so the neighbours a region's box
+ * takes in are left out, and the area's rural cells, far from its cities, stay in.
+ */
+export function cellsIn<C extends { lat: number; lon: number }>(cells: C[], w: Where): C[] {
+  const set = new Set(countriesOf(w));
+  return cells.filter((c) => set.has(countryAt(c) ?? ""));
+}
+
 const polygon = ([w, s, e, n]: Box) => `((${w} ${s}, ${e} ${s}, ${e} ${n}, ${w} ${n}, ${w} ${s}))`;
 
 /**
@@ -73,6 +118,7 @@ export const WORLD_LOCATION = `POLYGON${polygon([-179, -60, 179, 75])}`;
 
 /** The area, as the WKT shape Qloo's heatmap takes (filter.location): one request covers all of it. */
 export function locationOf(w: Where): string {
+  if (w.kind === "world") return WORLD_LOCATION;
   if (w.kind === "region") return `POLYGON${polygon(regionById(w.region).box)}`;
   const boxes = mergeBoxes(
     w.countries.flatMap((iso) => {

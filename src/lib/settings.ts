@@ -34,6 +34,10 @@ const SETTINGS = {
   DAILY_PLANS: count(300),
   /** New plans, brand matches and pairings one visitor can make in an hour. */
   HOURLY_PLANS: count(8),
+  /** Messages to tour managers the whole server answers in 24 hours. */
+  DAILY_CHAT: count(600),
+  /** Messages to tour managers one visitor can send in an hour. */
+  HOURLY_CHAT: count(30),
   /** The Chrome or Edge that prints decks as PDF (default: the usual install places). */
   PDF_BROWSER: text,
   /** The public address, when a proxy in front shows the server another origin. */

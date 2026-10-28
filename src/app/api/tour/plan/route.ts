@@ -1,3 +1,4 @@
+import { newActId } from "@/core/tour/named";
 import { TourError, planInput, type TourStage, type Plan } from "@/core/tour/types";
 import { planTour } from "@/platform/tour/agent";
 import { browserOf, errorResponse, forbidden, fromOurPages, NO_STORE, visitorOf } from "@/platform/tour/http";
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
     if (text.length > 4000) throw new TourError("body_size", "This request is too large.", 413);
     const parsed = planInput.safeParse(JSON.parse(text));
     if (!parsed.success) throw new TourError("validation", parsed.error.issues[0]?.message ?? "Check the request.");
-    input = parsed.data;
+    // An act Qloo doesn't know is known by its name.
+    input = parsed.data.newAct ? { ...parsed.data, actId: newActId(parsed.data.newAct.name) } : parsed.data;
     owner = await browserOf();
     parent = input.parentId ? await getPlan(input.parentId) : undefined;
     const reuse = await recentPlanFor(input);

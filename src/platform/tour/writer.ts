@@ -69,7 +69,7 @@ export function templatePitch(f: WriterFacts): PitchPack {
   };
 }
 
-const MONEY = /[$€£]\s?\d|\d+(\.\d+)?\s?(k|m|million|thousand)\b|\d+\s?%/i;
+export const MONEY = /[$€£]\s?\d|\d+(\.\d+)?\s?(k|m|million|thousand)\b|\d+\s?%/i;
 
 /** Rejects writer output that names IDs it wasn't given or states money or percentages the facts don't contain. */
 export function checkPitch(p: z.infer<typeof pitchSchema>, f: WriterFacts): string | undefined {
@@ -88,7 +88,12 @@ export type Writer = (facts: WriterFacts, signal?: AbortSignal) => Promise<Pitch
 const openAiWriter: Writer = async (f, signal) => {
   const facts = {
     act: { name: f.act.name, comedian: f.act.comedian, description: f.act.description },
-    signalBasis: f.signal.basis === "similar" ? `estimated from similar acts: ${f.signal.similar.map((s) => s.name).join(", ")}` : "the act's own Qloo data",
+    signalBasis:
+      f.signal.basis === "similar"
+        ? `estimated from similar acts: ${f.signal.similar.map((s) => s.name).join(", ")}`
+        : f.signal.basis === "named"
+          ? `predicted from the acts named as like it (the act isn't in Qloo yet): ${f.signal.similar.map((s) => s.name).join(", ")}`
+          : "the act's own Qloo data",
     audience: { tasteTags: f.fanDna.tags.map((t) => t.name), demographics: f.fanDna.demographics, alsoLoves: f.fanDna.loves.map((l) => `${l.label}: ${l.entity.name}`) },
     route: f.route.map((c) => ({ cityId: c.id, name: placeOf(c), fanHeat: c.heat, hiddenMarket: c.hidden, bigMetro: c.obvious })),
     sponsors: f.sponsors.slice(0, 3).map((s) => ({
@@ -120,12 +125,27 @@ const openAiWriter: Writer = async (f, signal) => {
     cityNotes: result.cityNotes.map((n) => ({ ...n, cityId: f.route.find((c) => c.id.toLowerCase() === n.cityId.toLowerCase())!.id })),
     emails: result.emails.map((e) => ({ ...e, brandId: e.brandId.toUpperCase() })),
     writer: "openai",
-    model: MODELS.writer,
+    model: MODELS.writer.model,
   };
 };
 
-/** The writer to use: the AI writer when OpenAI is configured, otherwise the plain template. */
-export const defaultWriter = (): Writer => (setting("OPENAI_API_KEY") ? openAiWriter : async (f) => templatePitch(f));
+/**
+ * The writer to use: the AI writer when OpenAI is configured, otherwise the plain template. When OpenAI fails (an
+ * outage, the credit runs out), the plan still gets made, with the template and a note saying so.
+ */
+export const defaultWriter = (): Writer =>
+  setting("OPENAI_API_KEY")
+    ? async (f, signal) => {
+        try {
+          return await openAiWriter(f, signal);
+        } catch (error) {
+          if (signal?.aborted) throw error;
+          console.error("The AI writer failed, so the plan uses the template:", error);
+          const plain = templatePitch(f);
+          return { ...plain, tourBrief: `${plain.tourBrief} (The AI writer didn't answer, so this plain version is shown instead.)` };
+        }
+      }
+    : async (f) => templatePitch(f);
 
 const norm = (s: string) => s.toLowerCase().replace(/^st.?s/, "saint ").normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z ]/g, "").trim();
 /** A city named in a message, among these cities: by name, and by state or country when given ("Portland, OR"). */

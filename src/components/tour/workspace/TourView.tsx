@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BadgeCheck, Bookmark, BookmarkCheck, CalendarCheck, Download, Handshake, Link2, ListChecks, LoaderCircle, Megaphone, Route as RouteIcon, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, Bookmark, BookmarkCheck, CalendarCheck, Download, Handshake, Link2, ListChecks, LoaderCircle, Megaphone, MessagesSquare, Route as RouteIcon, X } from "lucide-react";
 import { nextUp } from "@/core/tour/next";
 import type { ActMemory, TourStage, Plan, PlanInput, Track } from "@/core/tour/types";
 import { AgentTrace } from "../AgentTrace";
@@ -17,10 +17,11 @@ import { NextTab } from "./NextTab";
 import { DraftDialog } from "./parts";
 import { PlanTab } from "./PlanTab";
 import { PromoteTab } from "./PromoteTab";
+import { TeamTab } from "./TeamTab";
 import { useGuides, useTracks } from "./state";
 
-export type Tab = "plan" | "book" | "fund" | "promote" | "next";
-const TABS: { id: Tab; label: string; icon: typeof RouteIcon }[] = [
+export type Tab = "plan" | "team" | "book" | "fund" | "promote" | "next";
+const TABS: { id: Exclude<Tab, "team">; label: string; icon: typeof RouteIcon }[] = [
   { id: "plan", label: "Plan", icon: RouteIcon },
   { id: "book", label: "Book", icon: CalendarCheck },
   { id: "fund", label: "Fund", icon: Handshake },
@@ -45,7 +46,8 @@ export interface TourActions {
 
 /**
  * A tour, as a workspace: the plan on the left in five tabs (the route, booking the venues, funding it with sponsors,
- * reaching the fans, what to do next), and the real map on the right, following whichever stop is in hand.
+ * reaching the fans, what to do next), the tour team to talk to from any of them, and the real map on the right,
+ * following whichever stop is in hand.
  */
 export function TourView({
   plan,
@@ -77,7 +79,7 @@ export function TourView({
   const [run, setRun] = useState<{ stages: TourStage[]; error?: string }>();
   const [saved, setSaved] = useState(initiallySaved);
   const [turnedDown, setTurnedDown] = useState<string[]>(memory?.excludeBrandIds ?? []);
-  const { tracks, statusOf, set, error: trackError } = useTracks(plan.id, initialTracks);
+  const { tracks, statusOf, set, saved: savedTrack, error: trackError } = useTracks(plan.id, initialTracks);
   const { guides, load } = useGuides(plan.id);
 
   const city = (id: string) => plan.cities.find((c) => c.id === id);
@@ -203,6 +205,10 @@ export function TourView({
               <span className="hl-chip hl-chip-good">
                 <BadgeCheck size={14} aria-hidden /> From {plan.act.name}&apos;s own Qloo data
               </span>
+            ) : plan.signal.basis === "named" ? (
+              <span className="hl-chip hl-chip-warn">
+                <AlertTriangle size={14} aria-hidden /> Predicted from {plan.signal.similar.map((a) => a.name).join(", ")}
+              </span>
             ) : (
               <span className="hl-chip hl-chip-warn">
                 <AlertTriangle size={14} aria-hidden /> Estimated from similar acts
@@ -284,11 +290,21 @@ export function TourView({
 
         <div className="hl-tour-body">
           {tab === "plan" && <PlanTab plan={plan} routeCities={routeCities} active={active} onActive={setActive} actions={actions} ai={ai} running={!!run && !run.error} />}
+          {tab === "team" && <TeamTab plan={plan} actions={actions} onTrack={savedTrack} />}
           {tab === "book" && <BookTab plan={plan} stop={stop} onStop={setStop} guide={guide} reload={(id) => void load(id, true)} actions={actions} />}
           {tab === "fund" && <FundTab plan={plan} turnedDown={turnedDown} actions={actions} deck={{ busy: deck.busy, download: () => void downloadDeck() }} />}
           {tab === "promote" && <PromoteTab plan={plan} stop={stop} onStop={setStop} guide={guide} reload={(id) => void load(id, true)} />}
           {tab === "next" && <NextTab plan={plan} tasks={tasks} progress={progress} actions={actions} />}
         </div>
+        {tab !== "team" && (
+          <button type="button" className="hl-team-launch" onClick={() => actions.goTo("team")}>
+            <MessagesSquare size={18} aria-hidden />
+            <span>
+              <b>Ask your tour team</b>
+              <small>The route, venues, sponsors and fans</small>
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="hl-tour-map">
@@ -308,6 +324,12 @@ export function TourView({
           label={`Map of ${plan.act.name}'s tour: Qloo's heatmap of where the fans are, and the route`}
         />
         <div className="hl-map-key" aria-hidden>
+          {plan.signal.basis === "named" && (
+            <>
+              <b>Predicted</b>
+              <span className="hl-map-key-sep" />
+            </>
+          )}
           <span className="hl-map-key-heat">Fewer fans</span>
           <span className="hl-map-key-grad" />
           <span className="hl-map-key-heat">More fans</span>

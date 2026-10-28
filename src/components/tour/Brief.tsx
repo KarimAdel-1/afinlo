@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Globe2, LoaderCircle, MapPin, Search, Sparkles, X } from "lucide-react";
+import { newActOf } from "@/core/tour/named";
 import { regionById, whereLabel, type RegionId, type Where } from "@/core/tour/regions";
 import { SPONSOR_CATEGORIES, type Act, type ActMemory, type TourStage, type SponsorCategory } from "@/core/tour/types";
 import { AgentTrace } from "./AgentTrace";
@@ -18,13 +19,15 @@ const STEPS: [Step, string][] = [
   ["build", "The tour"],
 ];
 interface Scan {
-  basis: "act" | "similar";
+  basis: "act" | "similar" | "named";
   similar: string[];
   points: [number, number, number][];
   countries: { iso: string; name: string; heat: number; cities: number; top: { id: string; name: string; heat: number; lat: number; lon: number } }[];
   regions: { id: RegionId; label: string; heat: number; countries: string[] }[];
 }
 const kindOf = (a: Act) => (a.comedian ? "Comedian" : a.kind === "person" ? "Person" : "Artist");
+/** Where the tour goes, as the brief names it on its own. */
+const areaName = (w: Where) => (w.kind === "world" ? "The whole world" : whereLabel(w));
 const about = (a: Act) => [a.disambiguation, a.description].filter(Boolean).join(" · ").slice(0, 220) || "No description in Qloo";
 const CATS = Object.entries(SPONSOR_CATEGORIES) as [SponsorCategory, (typeof SPONSOR_CATEGORIES)[SponsorCategory]][];
 
@@ -46,6 +49,9 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
   const [matches, setMatches] = useState<Act[]>();
   const [searching, setSearching] = useState(false);
   const [act, setAct] = useState<Act | undefined>(initialAct);
+  // An act Qloo doesn't know: being named, and the acts it's like once it is.
+  const [naming, setNaming] = useState(false);
+  const [like, setLike] = useState<Act[]>([]);
   const [scan, setScan] = useState<Scan>();
   const [scanError, setScanError] = useState("");
   const [area, setArea] = useState<Where>();
@@ -95,7 +101,7 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
   useEffect(() => {
     if (!act) return;
     let cancelled = false;
-    void postJson<Scan>("/api/tour/scan", { actId: act.id })
+    void postJson<Scan>("/api/tour/scan", act.predicted ? { newAct: { name: act.name, comedian: act.comedian, like: like.map((a) => a.id) } } : { actId: act.id })
       .then((s) => {
         if (cancelled) return;
         setScan(s);
@@ -117,10 +123,11 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the acts it's like are set with the act
   }, [act]);
 
   // The area's cities, for where the tour starts.
-  const areaKey = area ? (area.kind === "region" ? `region=${area.region}` : `countries=${area.countries.join(",")}`) : "";
+  const areaKey = area ? (area.kind === "world" ? "world=1" : area.kind === "region" ? `region=${area.region}` : `countries=${area.countries.join(",")}`) : "";
   useEffect(() => {
     if (!areaKey) return;
     let cancelled = false;
@@ -137,6 +144,7 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
 
   const mapFocus = useMemo(() => {
     if (!area) return undefined;
+    if (area.kind === "world") return { lat: 25, lon: 10, zoom: 1.2 };
     if (area.kind === "region") return viewOf(area.region);
     const tops = scan?.countries.filter((c) => area.countries.includes(c.iso)).map((c) => c.top) ?? [];
     if (!tops.length) return undefined;
@@ -165,6 +173,7 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
       const id = await streamPlan(
         {
           actId: act.id,
+          newAct: act.predicted ? { name: act.name, comedian: act.comedian, like: like.map((a) => a.id) } : undefined,
           where: area,
           stops,
           focus,
@@ -199,7 +208,24 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
           ))}
         </ol>
 
-        {step === "act" && (
+        {step === "act" && naming && (
+          <NamedAct
+            initialName={query.trim()}
+            onBack={() => setNaming(false)}
+            onDone={(a, named) => {
+              setScan(undefined);
+              setScanError("");
+              setArea(undefined);
+              setMemory(undefined);
+              setLike(named);
+              setAct(a);
+              setNaming(false);
+              setStep("where");
+            }}
+          />
+        )}
+
+        {step === "act" && !naming && (
           <section aria-labelledby="hl-step">
             <h1 id="hl-step" ref={heading} tabIndex={-1}>
               Who&apos;s going on tour?
@@ -252,6 +278,14 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
               </div>
             )}
             {matches && !matches.length && <p className="hl-hint">Qloo has no act by that name. Check the spelling, or try the name they perform under.</p>}
+            {matches && (
+              <p className="hl-hint">
+                Not in Qloo yet?{" "}
+                <button type="button" className="hl-linkish" onClick={() => setNaming(true)}>
+                  Plan from acts like them
+                </button>
+              </p>
+            )}
             {!!matches?.length && (
               <ul className="hl-results" aria-label="Matches in Qloo">
                 {matches.map((m) => (
@@ -288,7 +322,7 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
 
         {step === "where" && act && (
           <section aria-labelledby="hl-step">
-            <ActBadge act={act} onChange={() => setStep("act")} />
+            <ActBadge act={act} like={like} onChange={() => setStep("act")} />
             <h1 id="hl-step" ref={heading} tabIndex={-1}>
               Where to?
             </h1>
@@ -306,13 +340,21 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
             {scan && (
               <>
                 {scan.basis === "similar" && <p className="hl-note">Qloo has no map for {act.name} alone, so this is estimated from acts with overlapping audiences: {scan.similar.join(", ")}.</p>}
+                {scan.basis === "named" && <p className="hl-note">Qloo doesn&apos;t know {act.name} yet, so this map is predicted from the acts you named: {scan.similar.join(", ")}.</p>}
                 {!!scan.countries.length && (
                   <p className="hl-brief-top">
                     <Globe2 size={16} aria-hidden /> Strongest in {scan.countries.slice(0, 4).map((c) => c.name).join(", ")}
                   </p>
                 )}
                 <div className="hl-regions" role="radiogroup" aria-label="Regions">
-                  {scan.regions.slice(0, 8).map((r) => (
+                  <button type="button" role="radio" aria-checked={area?.kind === "world"} onClick={() => setArea({ kind: "world" })}>
+                    <span>
+                      <b>The whole world</b>
+                      <small>The strongest cities, anywhere</small>
+                    </span>
+                    <Globe2 size={18} className="hl-region-globe" aria-hidden />
+                  </button>
+                  {scan.regions.slice(0, 7).map((r) => (
                     <button key={r.id} type="button" role="radio" aria-checked={area?.kind === "region" && area.region === r.id} onClick={() => setArea({ kind: "region", region: r.id })}>
                       <span>
                         <b>{r.label}</b>
@@ -349,7 +391,7 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
                   </ul>
                 </details>
                 <div className="hl-brief-foot">
-                  <span className="hl-brief-choice">{area ? whereLabel(area) : "Choose where"}</span>
+                  <span className="hl-brief-choice">{area ? areaName(area) : "Choose where"}</span>
                   <button type="button" className="hl-button" disabled={!area} onClick={() => setStep("shape")}>
                     Next <ArrowRight size={17} aria-hidden />
                   </button>
@@ -366,7 +408,7 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
               What matters on this tour?
             </h1>
             <p className="hl-brief-lead">
-              {whereLabel(area)}.{" "}
+              {areaName(area)}.{" "}
               <button type="button" className="hl-linkish" onClick={() => setStep("where")}>
                 Change
               </button>
@@ -488,20 +530,20 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
       </div>
 
       <div className="hl-brief-map">
-        <TourMap points={scan?.points} coarse focus={mapFocus} label={act ? `Where ${act.name}'s fans are, worldwide, from Qloo's heatmap` : "World map"} />
+        <TourMap points={scan?.points} focus={mapFocus} label={act ? `Where ${act.name}'s fans are, worldwide, from Qloo's heatmap` : "World map"} />
         {act && !scan && !scanError && step !== "act" && <div className="hl-brief-maptag">Asking Qloo…</div>}
       </div>
     </div>
   );
 }
 
-function ActBadge({ act, onChange }: { act: Act; onChange?: () => void }) {
+function ActBadge({ act, like = [], onChange }: { act: Act; like?: Act[]; onChange?: () => void }) {
   return (
     <div className="hl-actbadge">
       <Avatar name={act.name} image={act.image} size={40} />
       <span>
         <b>{act.name}</b>
-        <small>{kindOf(act)}</small>
+        <small>{act.predicted ? `${kindOf(act)} · predicted from ${like.map((a) => a.name).join(", ")}` : kindOf(act)}</small>
       </span>
       {onChange && (
         <button type="button" className="hl-linkish" onClick={onChange}>
@@ -512,3 +554,119 @@ function ActBadge({ act, onChange }: { act: Act; onChange?: () => void }) {
   );
 }
 
+
+/** An act Qloo doesn't know: its name, whether it's a comedian, and two or three acts in Qloo its fans would love. */
+function NamedAct({ initialName, onBack, onDone }: { initialName: string; onBack: () => void; onDone: (act: Act, like: Act[]) => void }) {
+  const [name, setName] = useState(initialName);
+  const [comedian, setComedian] = useState(false);
+  const [like, setLike] = useState<Act[]>([]);
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<Act[]>();
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState("");
+  const asked = useRef("");
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) return;
+    const t = setTimeout(async () => {
+      asked.current = term;
+      setSearching(true);
+      setError("");
+      try {
+        const { acts } = await postJson<{ acts: Act[] }>("/api/tour/search", { query: term });
+        if (asked.current === term) setFound(acts);
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [query]);
+  const options = (found ?? []).filter((a) => !like.some((l) => l.id === a.id));
+
+  return (
+    <section aria-labelledby="hl-step">
+      <button type="button" className="hl-linkish" onClick={onBack}>
+        <ArrowLeft size={14} aria-hidden /> Back to the search
+      </button>
+      <h1 id="hl-step" tabIndex={-1}>
+        Not in Qloo yet?
+      </h1>
+      <p className="hl-brief-lead">Name two or three acts in Qloo whose fans would love this one. Their fans predict where yours are, and the tour says so.</p>
+      <div className="hl-question">
+        <h2>The act</h2>
+        <div className="hl-big-search">
+          <label htmlFor="hl-new-act" className="hl-visually-hidden">
+            The act&apos;s name
+          </label>
+          <input id="hl-new-act" value={name} onChange={(e) => setName(e.target.value)} placeholder="The act's name" autoComplete="off" maxLength={80} autoFocus={!initialName} />
+        </div>
+        <div className="hl-seg" style={{ marginTop: 12 }}>
+          <button type="button" aria-pressed={!comedian} onClick={() => setComedian(false)}>
+            Musician
+          </button>
+          <button type="button" aria-pressed={comedian} onClick={() => setComedian(true)}>
+            Comedian
+          </button>
+        </div>
+      </div>
+      <div className="hl-question">
+        <h2>Acts they&apos;re like</h2>
+        {!!like.length && (
+          <div className="hl-picks-row">
+            {like.map((a) => (
+              <button key={a.id} type="button" className="hl-chip-button" onClick={() => setLike((v) => v.filter((x) => x.id !== a.id))} aria-label={`Remove ${a.name}`}>
+                {a.name} <X size={13} aria-hidden />
+              </button>
+            ))}
+          </div>
+        )}
+        {like.length < 3 && (
+          <form className="hl-big-search" role="search" onSubmit={(e) => e.preventDefault()}>
+            <Search size={22} aria-hidden />
+            <label htmlFor="hl-like" className="hl-visually-hidden">
+              An act they&apos;re like
+            </label>
+            <input id="hl-like" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={like.length ? "Another act they're like" : "An act they're like"} autoComplete="off" maxLength={80} autoFocus={!!initialName} />
+            {searching && <LoaderCircle size={18} className="hl-spin" aria-hidden />}
+          </form>
+        )}
+        {error && (
+          <p className="hl-error" role="alert">
+            {error}
+          </p>
+        )}
+        {like.length < 3 && query.trim().length >= 2 && !!options.length && (
+          <ul className="hl-results" aria-label="Acts in Qloo">
+            {options.slice(0, 5).map((a) => (
+              <li key={a.id}>
+                <button
+                  type="button"
+                  className="hl-result-row"
+                  onClick={() => {
+                    setLike((v) => [...v, a].slice(0, 3));
+                    setQuery("");
+                    setFound(undefined);
+                  }}
+                >
+                  <Avatar name={a.name} image={a.image} size={44} />
+                  <span style={{ minWidth: 0 }}>
+                    <b>{a.name}</b>
+                    <small>
+                      {kindOf(a)} · {about(a)}
+                    </small>
+                  </span>
+                  <Check size={18} aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <button type="button" className="hl-button" disabled={name.trim().length < 2 || like.length < 2} onClick={() => onDone(newActOf({ name, comedian }), like)}>
+        Continue <ArrowRight size={18} aria-hidden />
+      </button>
+    </section>
+  );
+}

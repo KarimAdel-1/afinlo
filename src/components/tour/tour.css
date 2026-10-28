@@ -198,6 +198,15 @@
   font-size: 12px;
   line-height: 1.4;
 }
+.hl-summary-proof {
+  grid-column: 1 / -1;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--hl-line);
+}
+.hl-summary .hl-summary-proof b {
+  font-size: 26px;
+  white-space: normal;
+}
 
 /* Fan Heat, as a bar and a number */
 .hl-heat {
@@ -1079,4 +1088,162 @@
   gap: 8px;
   padding: 12px 20px;
   border-top: 1px solid var(--hl-line);
+}
+
+/* The tour team: the conversation, what the team is doing, what it made, and the message box */
+.hl-team {
+  display: grid;
+  gap: 16px;
+}
+.hl-team-log {
+  display: grid;
+  gap: 14px;
+}
+.hl-team-msg {
+  max-width: 92%;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.hl-team-msg.user {
+  justify-self: end;
+  padding: 10px 16px;
+  border-radius: 20px 20px 6px 20px;
+  background: var(--hl-ink);
+  color: #fff;
+}
+.hl-team-msg:not(.user) {
+  padding: 14px 16px;
+  border: 1px solid var(--hl-line);
+  border-radius: 20px 20px 20px 6px;
+  background: #fff;
+}
+.hl-team-msg > small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--hl-blue);
+  font-size: 12px;
+  font-weight: 600;
+}
+.hl-team-msg > p {
+  margin: 0;
+}
+.hl-team-cards {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  white-space: normal;
+}
+.hl-team-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--hl-soft);
+}
+.hl-team-card > svg {
+  flex-shrink: 0;
+  color: var(--hl-blue);
+}
+.hl-team-card > span {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.hl-team-card b {
+  font-size: 14px;
+}
+.hl-team-card small {
+  color: var(--hl-muted);
+  font-size: 12px;
+}
+.hl-team-card.quiet > svg {
+  color: var(--hl-good);
+}
+.hl-team-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--hl-muted);
+  font-size: 13px;
+}
+.hl-team-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hl-team-ask {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 8px 8px 18px;
+  border: 1.5px solid var(--hl-line);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 12px 30px -18px rgba(36, 32, 67, 0.35);
+}
+.hl-team-ask:focus-within {
+  border-color: var(--hl-blue);
+}
+.hl-team-ask textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--hl-ink);
+  font: inherit;
+  font-size: 15px;
+  resize: none;
+}
+.hl-team-ask textarea:focus-visible {
+  outline: none;
+}
+.hl-team-ask .hl-button {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 50%;
+}
+.hl-team-launch {
+  position: sticky;
+  bottom: 12px;
+  z-index: 7;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px 18px;
+  border: 1.5px solid var(--hl-line);
+  border-radius: 24px;
+  background: #fff;
+  color: var(--hl-ink);
+  text-align: left;
+  box-shadow: 0 12px 30px -18px rgba(36, 32, 67, 0.35);
+  transition: border-color 0.15s;
+}
+.hl-team-launch:hover {
+  border-color: var(--hl-blue);
+}
+.hl-team-launch > svg {
+  flex-shrink: 0;
+  color: var(--hl-blue);
+}
+.hl-team-launch span {
+  display: grid;
+}
+.hl-team-launch b {
+  font-size: 15px;
+}
+.hl-team-launch small {
+  color: var(--hl-muted);
+  font-size: 12px;
 }

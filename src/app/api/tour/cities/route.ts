@@ -7,7 +7,9 @@ export const runtime = "nodejs";
 /** The cities of a tour's area, biggest first: for choosing where the tour starts. */
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams;
-  const parsed = where.safeParse(q.get("region") ? { kind: "region", region: q.get("region") } : { kind: "countries", countries: (q.get("countries") ?? "").split(",").filter(Boolean) });
+  const parsed = where.safeParse(
+    q.get("world") ? { kind: "world" } : q.get("region") ? { kind: "region", region: q.get("region") } : { kind: "countries", countries: (q.get("countries") ?? "").split(",").filter(Boolean) },
+  );
   if (!parsed.success) return Response.json({ cities: [] }, { headers: NO_STORE });
   const cities = citiesIn(parsed.data)
     .sort((a, b) => b.population - a.population)

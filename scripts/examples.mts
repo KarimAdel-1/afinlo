@@ -4,7 +4,7 @@
 // the key is in). Brand matches and co-headliner pairings are rebuilt with --matches.
 //   npm run examples
 //   npm run examples -- --matches
-//   npm run examples -- "Phoebe Bridgers=uk-ireland" "John Mulaney"   (other acts; a region after =)
+//   npm run examples -- "Phoebe Bridgers=uk-ireland" "John Mulaney" "Bad Bunny=world"   (other acts; a region, or world, after =)
 
 process.loadEnvFile(".env.local");
 const { planTour } = await import("../src/platform/tour/agent");
@@ -48,7 +48,8 @@ for (const [name, region = "north-america"] of acts) {
     continue;
   }
   const started = Date.now();
-  const plan = await planTour({ actId: act.id, where: { kind: "region", region: regionId.parse(region) }, stops: 7 }, { client });
+  const where = region === "world" ? ({ kind: "world" } as const) : ({ kind: "region", region: regionId.parse(region) } as const);
+  const plan = await planTour({ actId: act.id, where, stops: 7 }, { client });
   plan.example = true;
   await savePlan(plan);
   const route = plan.route.map((r) => plan.cities.find((c) => c.id === r.cityId)!.name).join(" → ");

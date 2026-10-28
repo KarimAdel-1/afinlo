@@ -9,7 +9,7 @@ import { categoryOf, ringDash, TIER } from "@/components/tour/sponsors";
 import { planStops, StaticMap } from "@/components/tour/StaticMap";
 import "@/components/tour/tour.css";
 import { COUNTRY_NAMES } from "@/core/tour/regions";
-import { CITY_RADIUS_KM, DRIVE_KM, MIN_GAP_KM, TIER_WEIGHT } from "@/core/tour/scoring";
+import { CITY_RADIUS_KM, DRIVE_KM, MIN_GAP_KM, SPENDING_SOURCE, TIER_WEIGHT, WORLD_GAP_KM } from "@/core/tour/scoring";
 import { WORLD_CITIES, WORLD_SOURCE } from "@/core/tour/world";
 import { examplePlans } from "@/platform/tour/store";
 
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 const STEPS = [
-  { icon: Search, title: "You brief it", text: "An artist or comedian, where to tour (a region or countries, from a first look at where the fans are worldwide), and what matters." },
+  { icon: Search, title: "You brief it", text: "An artist or comedian, where to tour (the whole world, a region or countries, from a first look at where the fans are worldwide), and what matters." },
   { icon: Database, title: "Qloo tools", text: "Resolve the act, Fan DNA, the heatmap, brands, support acts, local spots. Up to four requests at a time.", tone: "qloo" },
   { icon: Calculator, title: "Scorers", text: "Plain TypeScript: Fan Heat, hidden markets, the route, Sponsor Fit. Same input, same output.", tone: "code" },
   { icon: PenLine, title: "Writer", text: "The pitch, booking requests and follow-ups are drafted from the scored results. With a language model connected, it writes them, and its draft is checked." },
@@ -103,6 +103,12 @@ export default async function HowItWorks() {
               The route takes the best cities by tour score (Fan Heat, weighted three to one against market size on a log scale), keeps at least two hidden markets when
               there are any, never puts two stops within {MIN_GAP_KM} km (a promoter&apos;s radius clause), and orders them to keep travel short. A leg up to{" "}
               {DRIVE_KM} km is a drive, a longer one a flight.
+            </li>
+            <li>
+              <Check size={17} aria-hidden />
+              A world tour spreads wider: shows at least {WORLD_GAP_KM.toLocaleString("en-US")} km apart, and no country with more than a quarter of them (two at least) while
+              others have fans. Its market size is what a city&apos;s people can spend, its population times its country&apos;s GDP per head. Qloo&apos;s world cells are about
+              150 km across, so a city counts only its own country&apos;s and leans on its country&apos;s average: one odd cell can&apos;t make it hot.
             </li>
             <li>
               <Check size={17} aria-hidden />
@@ -240,7 +246,7 @@ export default async function HowItWorks() {
         <div>
           <p>Taste data: Qloo Taste AI (the hackathon API), through every request in each plan&apos;s receipts.</p>
           <p>Cities: {WORLD_SOURCE.cities}. {WORLD_SOURCE.rule}.</p>
-          <p>Market sizes: {WORLD_SOURCE.population}.</p>
+          <p>Market sizes: {WORLD_SOURCE.population}. For a world tour, times GDP per head: {SPENDING_SOURCE}.</p>
           <p>Map: OpenFreeMap vector tiles, from OpenStreetMap data, drawn with MapLibre.</p>
         </div>
       </section>

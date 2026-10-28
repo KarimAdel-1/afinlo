@@ -239,14 +239,20 @@ export async function loves(client: QlooClient, ids: string[], traces: TasteTrac
 }
 
 /** Acts whose audiences overlap with this one: for support slots and, when the act's own data is thin, as its signal. */
-export async function similarActs(client: QlooClient, act: Act, traces: TasteTrace[], signal?: AbortSignal): Promise<(PlanEntity & { affinity: number; comedian: boolean })[]> {
-  const params: Record<string, string> = { "filter.type": "urn:entity:artist", "signal.interests.entities": act.id, "filter.exclude.entities": act.id, take: "10" };
+export async function similarActs(client: QlooClient, ids: string[], traces: TasteTrace[], signal?: AbortSignal): Promise<(PlanEntity & { affinity: number; comedian: boolean })[]> {
+  const params: Record<string, string> = { "filter.type": "urn:entity:artist", "signal.interests.entities": ids.join(","), "filter.exclude.entities": ids.join(","), take: "10" };
   return (await insightEntities(client, params, traces, signal)).flatMap((v) => {
     const e = planEntity(v);
     const affinity = num(record(record(v).query).affinity);
     const description = str(record(record(v).properties).short_description || record(record(v).properties).description, 400);
-    return e && affinity !== undefined && e.id !== act.id ? [{ ...e, affinity, comedian: COMEDY.test(description) }] : [];
+    return e && affinity !== undefined && !ids.includes(e.id) ? [{ ...e, affinity, comedian: COMEDY.test(description) }] : [];
   });
+}
+
+/** The acts a new act was named as like, from Qloo. Undefined if Qloo doesn't know one of them. */
+export async function namedActs(client: QlooClient, ids: string[], traces: TasteTrace[], signal?: AbortSignal): Promise<Act[] | undefined> {
+  const found = await Promise.all(ids.map((id) => actById(client, id, traces, signal)));
+  return found.every((a): a is Act => !!a) ? found : undefined;
 }
 
 /**
