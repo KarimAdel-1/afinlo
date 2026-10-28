@@ -1,0 +1,240 @@
+/* The pitch deck: A4 landscape pages, on screen as a stack of sheets, in print one sheet per page. */
+@page {
+  size: A4 landscape;
+  margin: 0;
+}
+.deck {
+  min-height: 100vh;
+  padding: 0 0 56px;
+  background: #e6e6ee;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.deck-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 20px;
+  background: rgba(230, 230, 238, 0.92);
+  backdrop-filter: blur(12px);
+}
+.deck-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.deck-pages {
+  overflow-x: auto;
+  padding: 8px 16px 0;
+}
+.deck-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 297mm;
+  height: 210mm;
+  margin: 0 auto 24px;
+  padding: 16mm 18mm 13mm;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 24px 60px -36px rgba(36, 32, 67, 0.55);
+  break-after: page;
+}
+.deck-page > h2 {
+  font-size: 34px;
+  line-height: 1.1;
+}
+.deck-lead {
+  max-width: 230mm;
+  margin-top: 6mm !important;
+  font-family: var(--font-display), sans-serif;
+  font-size: 21px;
+  line-height: 1.45 !important;
+  letter-spacing: -0.015em;
+  color: #2f3247;
+}
+.deck-cols h3 {
+  margin-bottom: 4mm;
+  font-family: var(--font-body), sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+  font-weight: 700;
+  color: var(--hl-blue);
+}
+.deck-foot {
+  position: absolute;
+  left: 18mm;
+  right: 18mm;
+  bottom: 8mm;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--hl-subtle);
+}
+.deck-note {
+  margin-top: auto !important;
+  padding-bottom: 6mm;
+  max-width: 220mm;
+  font-size: 12px;
+  color: var(--hl-muted);
+}
+
+/* Cover */
+.deck-cover {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
+  gap: 12mm;
+  align-items: center;
+  background: linear-gradient(150deg, #ffffff 0%, #f4f3fd 100%);
+}
+.deck-cover-copy .hl-tile {
+  width: 96px;
+  height: 96px;
+  border-radius: 28px;
+  font-size: 40px;
+}
+.deck-cover-copy h1 {
+  margin-top: 8mm;
+  font-size: 54px;
+  line-height: 1;
+}
+.deck-headline {
+  margin-top: 5mm !important;
+  font-family: var(--font-display), sans-serif;
+  font-size: 22px;
+  line-height: 1.35 !important;
+  letter-spacing: -0.02em;
+  color: #3a3d55;
+}
+.deck-facts {
+  display: flex;
+  gap: 10mm;
+  margin-top: 9mm !important;
+}
+.deck-facts li {
+  font-size: 13px;
+  color: var(--hl-muted);
+}
+.deck-facts b {
+  display: block;
+  font-family: var(--font-display), sans-serif;
+  font-size: 30px;
+  letter-spacing: -0.04em;
+  color: var(--hl-ink);
+}
+.deck-cover-map .hl-hexmap {
+  background: linear-gradient(160deg, #efeefb, #e7e5f8);
+}
+.deck-cover-map .hl-legend {
+  margin-top: 4mm;
+  font-size: 11px;
+}
+
+/* Inner pages */
+.deck-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10mm;
+  margin-top: 10mm;
+}
+.deck-cols-2 {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+}
+.deck-cols p {
+  font-size: 15px;
+  color: #3b3e52;
+}
+.deck-loves {
+  display: grid;
+  gap: 3mm;
+}
+.deck-loves li {
+  padding: 3mm 4mm;
+  border-radius: 12px;
+  background: var(--hl-soft);
+}
+.deck-loves small {
+  display: block;
+  font-size: 11px;
+  color: var(--hl-muted);
+}
+.deck-loves b {
+  font-size: 14px;
+}
+.deck-route {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4mm 12mm;
+  margin-top: 9mm !important;
+}
+.deck-route li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.deck-route li > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--hl-ink);
+  color: #fff;
+  font-family: var(--font-display), sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+}
+.deck-route li > span.lime {
+  background: var(--hl-lime);
+  color: var(--hl-ink);
+}
+.deck-route b {
+  display: block;
+  font-size: 15px;
+}
+.deck-route small {
+  display: block;
+  font-size: 12px;
+  color: var(--hl-muted);
+}
+.deck-brands {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5mm;
+  margin-top: 9mm;
+}
+.deck-brands .hl-sponsor {
+  padding: 16px;
+  gap: 10px;
+}
+.deck-close {
+  margin-top: 10mm !important;
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  color: var(--hl-blue);
+}
+
+@media print {
+  .deck {
+    padding: 0;
+    background: none;
+  }
+  .deck-bar {
+    display: none;
+  }
+  .deck-pages {
+    overflow: visible;
+    padding: 0;
+  }
+  .deck-page {
+    margin: 0;
+    box-shadow: none;
+  }
+}

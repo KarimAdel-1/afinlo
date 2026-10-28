@@ -1,0 +1,333 @@
+/* The dashboard: the canvas, with the page on a rounded sheet, and a Mac dock down the left: Osmo's dock turned
+   upright, on a glass shelf. App icons grow under the pointer and their neighbours a little less, each is named
+   beside it, and a dot marks the page that's open. */
+.hl-app {
+  /* The dock's unit: 12px, less on a short screen, so the dock still fits fully grown (64 units tall). */
+  --dock-u: clamp(8px, calc((100dvh - 48px) / 64), 12px);
+  /* The shelf: an icon (4 units) and its padding, and the border. */
+  --dock-w: calc(5 * var(--dock-u) + 2px);
+  flex: 1;
+  min-height: 100dvh;
+  background: var(--af2-canvas);
+}
+.hl-app-main {
+  min-width: 0;
+  min-height: calc(100dvh - 28px);
+  margin: 14px 14px 14px calc(var(--dock-w) + 24px);
+  border-radius: 28px;
+  background: #f6f6f9;
+}
+
+/* The dock */
+.hl-dock {
+  position: fixed;
+  top: 50%;
+  left: 12px;
+  z-index: 60;
+  font-size: var(--dock-u);
+  transform: translateY(-50%);
+}
+.hl-dock-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: var(--dock-w);
+  padding: 0.5em !important;
+  border: 1px solid rgb(255 255 255 / 0.75);
+  border-radius: 1.75em;
+  background: rgb(255 255 255 / 0.5);
+  box-shadow: 0 0 0 0.5px rgb(38 42 63 / 0.08), 0 12px 32px -14px rgb(36 32 67 / 0.35);
+}
+/* 5em at rest; under the pointer, Dock.tsx sets each icon's height every frame. */
+.hl-dock-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 5em;
+}
+.hl-dock-link {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+}
+.hl-dock-link {
+  padding: 0.5em 0;
+  border: 0;
+  background: none;
+}
+.hl-dock-link:focus-visible {
+  outline: none;
+}
+.hl-dock-link:focus-visible .hl-dock-icon {
+  outline: 3px solid #8f86ff;
+  outline-offset: 2px;
+}
+/* An app icon: a rounded square with a little light from above and a shadow below, its glyph scaled with it. */
+.hl-dock-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: 23%;
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    inset 0 -1px 0 rgb(0 0 0 / 0.08),
+    0 1px 1px rgb(0 0 0 / 0.08),
+    0 0.4em 0.8em -0.25em rgb(0 0 0 / 0.3);
+}
+.hl-dock-icon svg {
+  width: 50%;
+  height: 50%;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.2));
+}
+.hl-dock-icon img {
+  width: 64%;
+  height: 64%;
+  object-fit: contain;
+}
+.hl-dock-icon.white {
+  background: linear-gradient(180deg, #ffffff 0%, #ededf3 100%);
+}
+.hl-dock-icon.blue {
+  background: linear-gradient(160deg, #7a72ff 0%, #4336ff 52%, #2b1fd9 100%);
+}
+.hl-dock-icon.orange {
+  background: linear-gradient(160deg, #ffad8a 0%, #ff7a45 55%, #ef5a2b 100%);
+}
+.hl-dock-icon.pink {
+  background: linear-gradient(160deg, #ff8eab 0%, #ff4f7e 55%, #e5305f 100%);
+}
+.hl-dock-icon.violet {
+  background: linear-gradient(160deg, #b08cf0 0%, #7d4fc9 60%, #6237ad 100%);
+}
+.hl-dock-icon.ink {
+  background: linear-gradient(160deg, #50577b 0%, #262a3f 72%);
+}
+.hl-dock-icon.teal {
+  background: linear-gradient(160deg, #46bcd1 0%, #0e7490 65%, #0a5a70 100%);
+}
+.hl-dock-icon.lime {
+  background: linear-gradient(160deg, #fbffd6 0%, #efff8a 50%, #d6eb40 100%);
+  color: #3f4a00;
+}
+.hl-dock-icon.lavender {
+  background: linear-gradient(160deg, #ffffff 0%, #e4e3f8 60%, #d2cff5 100%);
+  color: #4336ff;
+}
+.hl-dock-icon:is(.lime, .lavender, .white) svg {
+  filter: none;
+}
+/* The open page's dot, at the screen-edge side of its icon, as on a Mac dock at the left. */
+.hl-dock-item.is-open::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -0.42em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #262a3f;
+  transform: translateY(-50%);
+}
+.hl-dock-sep {
+  align-self: center;
+  width: 70%;
+  height: 1px;
+  margin: 0.4em 0;
+  background: rgb(38 42 63 / 0.16);
+}
+/* Its name, sliding out beside it: a light label, as in Osmo's dock. */
+.hl-dock-tip {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  z-index: 0;
+  padding: 6px 11px;
+  border-radius: 7px;
+  background: rgb(248 248 250 / 0.97);
+  color: var(--hl-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 0 0 0.5px rgb(38 42 63 / 0.16), 0 8px 20px -8px rgb(36 32 67 / 0.4);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-10px, -50%);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hl-dock-item:hover .hl-dock-tip,
+.hl-dock-item:has(.hl-dock-link:focus-visible) .hl-dock-tip {
+  opacity: 1;
+  transform: translate(14px, -50%);
+}
+
+/* On a phone, and on a tablet with no pointer to point with: a top bar, and the pages in a menu. */
+.hl-topbar {
+  display: none;
+}
+@media (max-width: 767px), (hover: none) and (max-width: 1199px) {
+  .hl-dock {
+    display: none;
+  }
+  .hl-app-main {
+    margin: 0 8px 8px;
+    border-radius: 24px;
+  }
+  .hl-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    padding: 0 12px 0 16px;
+    background: rgb(238 238 240 / 0.94);
+    backdrop-filter: blur(14px);
+  }
+  .hl-topbar img {
+    height: 36px;
+  }
+}
+.hl-topbar-menu {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--hl-ink);
+}
+.hl-drawer-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+.hl-drawer-shade {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(23 22 40 / 0.35);
+}
+.hl-drawer {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(320px, 86vw);
+  padding: 12px 14px 18px;
+  overflow-y: auto;
+  background: var(--af2-canvas);
+  box-shadow: 0 20px 60px -20px rgba(23, 22, 40, 0.5);
+}
+.hl-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding-left: 4px;
+  margin-bottom: 4px;
+}
+.hl-drawer-head img {
+  height: 36px;
+}
+.hl-drawer-list {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0 !important;
+}
+.hl-drawer-list + .hl-drawer-list {
+  border-top: 1px solid #d9d9e1;
+}
+.hl-drawer-list a {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.hl-drawer-list a[aria-current="page"] {
+  background: #fff;
+}
+.hl-drawer-list .hl-dock-icon {
+  height: 38px;
+}
+
+/* Dialogs keep a dialog's headings, not the page's. */
+.hl-app dialog h2 {
+  font-size: 19px;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+/* A page's head: the title on the left, what it's for under it, actions on the right. */
+.hl-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding: 34px 0 24px;
+}
+.hl-page-head > div:first-child {
+  min-width: 0;
+}
+.hl-page-head h1 {
+  font-size: clamp(30px, 3vw, 40px);
+  line-height: 1.08;
+}
+.hl-page-head p {
+  max-width: 720px;
+  margin-top: 8px;
+  color: var(--hl-muted);
+  font-size: 16px;
+}
+.hl-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* The pages, sized for the sheet. */
+.hl-app-main .hl-flow,
+.hl-app-main .hl-result {
+  max-width: 1280px;
+  padding: 0 32px 64px;
+}
+.hl-app-main .hl-result {
+  padding-top: 28px;
+}
+.hl-app-main .hl-stepbar {
+  justify-content: flex-start;
+}
+@media (max-width: 720px) {
+  .hl-app-main .hl-flow,
+  .hl-app-main .hl-result {
+    padding: 0 12px 40px;
+  }
+  .hl-app-main .hl-result {
+    padding-top: 12px;
+  }
+  .hl-page-head {
+    padding: 24px 6px 18px;
+  }
+}
+
+.hl-empty .hl-actions-inline {
+  justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hl-dock-tip {
+    transition: none;
+  }
+}

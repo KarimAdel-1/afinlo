@@ -1,0 +1,15 @@
+{
+  "instructions": "For each act, open its public streaming profile (for example the 'Where people listen' panel on its Spotify artist page) and record its top US cities in order, the source and the date you checked. Don't plan a tour for an act before recording it. Then run: npm run backtest",
+  "acts": [
+    { "act": "Khruangbin", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Morgan Wallen", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Phoebe Bridgers", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Tyler, the Creator", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Bad Bunny", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Glass Beams", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Mitski", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Zach Bryan", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Kamasi Washington", "source": "", "checkedAt": "", "topCities": [] },
+    { "act": "Arooj Aftab", "source": "", "checkedAt": "", "topCities": [] }
+  ]
+}

@@ -1,0 +1,72 @@
+// Browser helpers for the app's own API.
+import type { TourStage, PlanInput } from "@/core/tour/types";
+
+export async function postJson<T>(url: string, body: object): Promise<T> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "That didn't work. Please try again.");
+  return json as T;
+}
+
+/**
+ * Starts a run (a plan, a brand match, a co-headliner pairing) and reports each stage as the agent reaches it.
+ * Resolves with the result's ID.
+ */
+export async function streamRun(url: string, input: object, onStage: (s: TourStage) => void): Promise<string> {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (res.headers.get("content-type")?.includes("application/json")) {
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || "That didn't work. Please try again.");
+    return (json.planId ?? json.id) as string;
+  }
+  if (!res.ok || !res.body) throw new Error("Afinlo couldn't start this. Please try again.");
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += value ?? "";
+    const lines = buffer.split("\n");
+    buffer = done ? "" : lines.pop()!;
+    for (const line of lines.filter(Boolean)) {
+      const event = JSON.parse(line) as { stage?: TourStage; planId?: string; id?: string; error?: string };
+      if (event.stage) onStage(event.stage);
+      if (event.error) throw new Error(event.error);
+      if (event.planId ?? event.id) return (event.planId ?? event.id)!;
+    }
+    if (done) throw new Error("The connection closed before it finished. Please try again.");
+  }
+}
+
+/** Starts a plan and reports each stage as the agent reaches it. Resolves with the plan's ID. */
+export const streamPlan = (input: PlanInput & { parentId?: string }, onStage: (s: TourStage) => void) => streamRun("/api/tour/plan", input, onStage);
+
+export function stageLabel(s: TourStage): string {
+  switch (s.stage) {
+    case "resolving":
+      return `Resolving ${s.act} in Qloo`;
+    case "cities":
+      return `Scanning ${s.count} candidate cities with Qloo's heatmap`;
+    case "fallback":
+      return `Thin data for this act: estimating from acts like it (${s.similar.slice(0, 3).join(", ")})`;
+    case "dna":
+      return "Building the Fan DNA: taste, demographics, what fans love elsewhere";
+    case "sponsors":
+      return "Matching the brands these fans love";
+    case "support":
+      return "Finding support acts with overlapping audiences";
+    case "scoring":
+      return "Scoring Fan Heat, the route and Sponsor Fit (plain code, no AI)";
+    case "local":
+      return `Finding venues and local spots in ${s.cities.join(", ")}`;
+    case "writing":
+      return "Writing the pitch pack";
+    case "acts":
+      return `Finding the ${s.kinds === "comedy" ? "comedians" : s.kinds === "music" ? "artists" : "artists and comedians"} whose fans love this brand`;
+    case "overlap":
+      return `Mapping where both audiences are strongest, for ${s.count} acts`;
+    case "pair":
+      return `Comparing ${s.a}'s and ${s.b}'s audiences, city by city`;
+    case "route":
+      return "Planning the double-bill route (plain code, no AI)";
+  }
+}

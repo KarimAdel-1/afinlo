@@ -1,0 +1,213 @@
+/* Home and Acts: the tours as cards with the act's photo, and what needs doing next. */
+.hl-home .hl-home-block {
+  margin-top: 26px;
+}
+.hl-start {
+  padding: 28px;
+  background: linear-gradient(135deg, #f1f0ff, #fff 60%);
+}
+.hl-start h2 {
+  margin-bottom: 16px !important;
+  font-size: 24px;
+}
+.hl-tasks a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--hl-line);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--hl-ink);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.hl-tasks a:hover {
+  border-color: #c9c5ff;
+  box-shadow: 0 10px 24px -18px rgba(67, 54, 255, 0.6);
+}
+.hl-tourgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.hl-tourgrid > .hl-tourcards {
+  display: contents;
+}
+.hl-tourcards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.hl-tourcard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--hl-line);
+  border-radius: 22px;
+  background: #fff;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.hl-tourcard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 40px -26px rgba(36, 32, 67, 0.45);
+}
+.hl-tourcard-cover {
+  position: relative;
+  display: block;
+  height: 170px;
+  overflow: hidden;
+}
+.hl-tourcard-cover img {
+  object-fit: cover;
+  transition: transform 0.5s;
+}
+.hl-tourcard:hover .hl-tourcard-cover img {
+  transform: scale(1.04);
+}
+.hl-tourcard-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(23, 22, 40, 0) 35%, rgba(23, 22, 40, 0.72));
+}
+.hl-tourcard-name {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  display: grid;
+  color: #fff;
+}
+.hl-tourcard-name b {
+  overflow: hidden;
+  font-family: var(--font-display), sans-serif;
+  font-size: 21px;
+  letter-spacing: -0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hl-tourcard-name small {
+  font-size: 13px;
+  opacity: 0.88;
+}
+.hl-tourcard-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: rgb(255 255 255 / 0.9);
+  color: var(--hl-blue-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.hl-tourcard-body {
+  display: grid;
+  flex: 1;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+.hl-tourcard-route {
+  overflow: hidden;
+  color: var(--hl-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hl-tourcard-meter {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #ececf4;
+}
+.hl-tourcard-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--hl-good);
+}
+.hl-tourcard-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--hl-muted);
+  font-size: 12px;
+}
+.hl-tourcard-open {
+  color: var(--hl-blue);
+  font-weight: 700;
+}
+.hl-newtour {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  min-height: 260px;
+  padding: 20px;
+  border: 1.5px dashed #cfcde6;
+  border-radius: 22px;
+  color: var(--hl-muted);
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+.hl-newtour:hover {
+  border-color: var(--hl-blue);
+  background: #fff;
+}
+.hl-newtour > span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--hl-blue);
+  color: #fff;
+}
+.hl-newtour b {
+  color: var(--hl-ink);
+  font-size: 16px;
+}
+.hl-newtour small {
+  font-size: 13px;
+}
+
+/* Acts */
+.hl-acts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+.hl-actcard {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+.hl-actcard-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.hl-actcard-top .hl-tile {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+}
+.hl-actcard-top h2 {
+  font-size: 20px;
+}
+.hl-actcard-top small {
+  color: var(--hl-muted);
+  font-size: 13px;
+}
+.hl-actcard ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hl-actcard-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

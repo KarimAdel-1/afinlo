@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* The page's base: Tailwind, with the body font as its sans-serif, and the canvas behind every page. */
+@theme inline {
+  --font-sans: var(--font-body);
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #eeeef0;
+  color: #262a3f;
+}
