@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import Form from "next/form";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Dna, Handshake, Map as MapIcon, MapPin, Plus, Search, Send, Sparkles } from "lucide-react";
+import { ArrowRight, Dna, Handshake, Map as MapIcon, Plus, Send } from "lucide-react";
+import { HeroLines } from "@/components/site/HeroLines";
 import "@/components/tour/base.css";
+import { HowOnScroll } from "@/components/tour/HowOnScroll";
 import { PHOTOS } from "@/components/tour/photos";
-import { planStops, StaticMap } from "@/components/tour/StaticMap";
 import { examplePlans } from "@/platform/tour/store";
+import { howStory } from "@/platform/tour/story";
 
 export const metadata: Metadata = {
   title: { absolute: "Afinlo — find your real fans, get paid to reach them" },
@@ -25,13 +26,14 @@ const FAQ = [
 
 export default async function HomePage() {
   const examples = await examplePlans().catch(() => []);
-  const hero = examples[0];
-  // The hero shows the first example; the grid shows the others when there are enough.
-  const grid = examples.length > 4 ? examples.slice(1, 5) : examples.slice(0, 4);
+  // How it works follows one tour from the search to the outreach.
+  const tour = examples.find((e) => e.act.name === "Khruangbin") ?? examples[0];
+  const story = tour && (await howStory(tour));
 
   return (
     <>
       <section className="af2-home-hero">
+        <HeroLines />
         <div className="af2-hero-copy">
           <h1>
             Find your real fans.
@@ -42,47 +44,15 @@ export default async function HomePage() {
             Enter an artist or comedian. Afinlo finds the cities where their audience over-indexes and the brands those fans already love, then drafts the
             sponsor pitch. Every result comes from Qloo&apos;s taste data.
           </p>
-          <div className="hl hl-home-search">
-            <Form action="/plan" role="search">
-              <Search size={20} aria-hidden />
-              <label htmlFor="hl-home-act" className="hl-visually-hidden">
-                An artist or comedian
-              </label>
-              <input id="hl-home-act" name="q" placeholder="An artist or comedian" autoComplete="off" maxLength={80} minLength={2} required />
-              <button className="hl-button" type="submit">
-                <span>Plan a tour</span>
-                <ArrowRight size={18} aria-hidden />
-              </button>
-            </Form>
-            {!!examples.length && (
-              <div className="hl-picks">
-                {examples.map((e) => (
-                  <Link key={e.id} className="hl-pick" href={`/tour/${e.id}`}>
-                    <i className={e.act.comedian ? "comic" : ""} aria-hidden />
-                    {e.act.name}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="af2-hero-stage">
-          <div className="af2-hero-note af2-hero-note-left">
-            <MapPin size={21} />
-            <span>
-              <b>Where the fans really are.</b>
-              <small>Hidden markets, city by city.</small>
-            </span>
-          </div>
-          <div className="hl hl-hero-map">
-            <StaticMap points={hero?.heatPoints} stops={hero ? planStops(hero) : []} width={640} height={420} label={hero ? `${hero.act.name}'s tour of ${hero.area ?? "the United States"}, over Qloo's heatmap of the fans` : "World map"} />
-          </div>
-          <div className="af2-hero-note af2-hero-note-right">
-            <Sparkles size={21} />
-            <span>
-              <b>Who will want to sponsor.</b>
-              <small>Brands these fans already love.</small>
-            </span>
+          <div className="af2-hero-actions">
+            <Link className="af2-button" href="/plan">
+              Plan a tour
+              <ArrowRight size={18} aria-hidden />
+            </Link>
+            {/* Down to the section below when it's there; it needs the example tours. */}
+            <a className="af2-button af2-button-secondary" href={story ? "#how-it-works" : "/how-it-works"}>
+              How it works
+            </a>
           </div>
         </div>
       </section>
@@ -132,30 +102,28 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {grid.length > 1 && (
-        <section className="af2-section">
+      {tour && story && (
+        <section className="af2-section" id="how-it-works">
           <div className="af2-section-title">
-            <h2>Every act gets its own map.</h2>
-            <p>The same question, asked for different acts. These are real Afinlo plans, straight from Qloo&apos;s data.</p>
+            <h2>How it works.</h2>
+            <p>
+              Follow one tour, {story.actName}&apos;s in {story.area}, from the search to the outreach.
+            </p>
           </div>
-          <div className="hl hl-minimaps">
-            {grid.map((e) => (
-              <Link key={e.id} className="hl-minimap" href={`/tour/${e.id}`}>
-                <b>
-                  {e.act.name}
-                  <span>
-                    Open the tour <ArrowRight size={14} aria-hidden />
-                  </span>
-                </b>
-                <StaticMap points={e.heatPoints} stops={planStops(e)} width={420} height={270} numbered={false} label={`${e.act.name}'s tour of ${e.area ?? "the United States"}, over Qloo's heatmap`} />
-                {e.proof && (
-                  <small>
-                    Fan Heat {e.proof.route} on the route · {e.proof.biggest} in the {e.proof.biggestCities.length} biggest cities
-                  </small>
-                )}
-              </Link>
-            ))}
-          </div>
+          <HowOnScroll
+            story={story}
+            steps={[
+              { title: "Name the act.", text: "Search any artist or comedian, and confirm the match from Qloo. Not in Qloo yet? Name two or three acts like them, and the tour is planned from their fans and labelled as predicted." },
+              { title: "See where the fans are.", text: "Qloo's heatmap scores every city in the area by how strongly this act's fans stand out: its Fan Heat. Strong cities outside the biggest metros are hidden markets." },
+              {
+                title: "Get the route.",
+                text: `The best cities by Fan Heat and market size, ordered to keep travel short.${tour.proof ? ` Here, Fan Heat ${tour.proof.route} on the route, against ${tour.proof.biggest} in the ${tour.proof.biggestCities.length} biggest cities.` : ""}`,
+              },
+              { title: "Book the venues.", text: "In each city, the music venues or comedy clubs these fans love, each with a drafted hold request and where it stands." },
+              { title: "Fund the tour.", text: "The brands these fans love, ranked by Sponsor Fit, each with its evidence and a drafted pitch. Afinlo never sends anything for you." },
+              { title: "Ask your tour team.", text: "A manager and four specialists work from the tour's data. They explain why a city is on the route, propose changes you apply in a click, and draft the outreach." },
+            ]}
+          />
         </section>
       )}
 

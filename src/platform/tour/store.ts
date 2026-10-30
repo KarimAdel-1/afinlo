@@ -121,14 +121,14 @@ export async function exampleMatches<T>(kind: MatchKind): Promise<T[]> {
 }
 
 /** The newest example plan for each example act, for the one-click examples. */
-export async function examplePlans(): Promise<Pick<Plan, "id" | "act" | "cities" | "sponsors" | "route" | "proof" | "heatPoints" | "area" | "traces">[]> {
+export async function examplePlans(): Promise<Pick<Plan, "id" | "act" | "cities" | "sponsors" | "route" | "proof" | "heatPoints" | "area" | "traces" | "request" | "localSpots" | "pitch">[]> {
   const rows = await db()
     .prepare("SELECT DISTINCT ON (act_id) plan FROM tour_plans WHERE example = 1 ORDER BY act_id, created_at DESC")
     .all<{ plan: string }>();
   return rows
     .map((r) => JSON.parse(r.plan) as Plan)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map(({ id, act, cities, sponsors, route, proof, heatPoints, area, traces }) => ({ id, act, cities, sponsors, route, proof, heatPoints, area, traces }));
+    .map(({ id, act, cities, sponsors, route, proof, heatPoints, area, traces, request, localSpots, pitch }) => ({ id, act, cities, sponsors, route, proof, heatPoints, area, traces, request, localSpots, pitch }));
 }
 
 /**

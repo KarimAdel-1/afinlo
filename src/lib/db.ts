@@ -62,16 +62,23 @@ const numbered = (sql: string) => {
   return sql.replace(/'[^']*'|"[^"]*"|\?/g, (m) => (m === "?" ? `$${++n}` : m));
 };
 
-/** Makes the tables that are missing, one server at a time. */
+/**
+ * Makes the tables that are missing, one server at a time. The lock ends with the transaction, because a connection
+ * pooler in transaction mode (Neon's, on Vercel) can't keep a lock held across statements for a session.
+ */
 async function makeTables(pool: pg.Pool) {
   const have = await pool.query<{ n: number }>("SELECT COUNT(*) AS n FROM pg_tables WHERE schemaname = current_schema() AND tablename = ANY($1)", [NAMES]);
   if (have.rows[0].n === NAMES.length) return;
   const client = await pool.connect();
   try {
-    await client.query("SELECT pg_advisory_lock(7253110)");
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(7253110)");
     for (const sql of TABLES) await client.query(sql);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
   } finally {
-    await client.query("SELECT pg_advisory_unlock(7253110)").catch(() => {});
     client.release();
   }
 }

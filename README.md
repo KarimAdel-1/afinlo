@@ -80,7 +80,7 @@ flowchart LR
   - Its market size is what its people can spend: its population times its country's GDP per head (Natural Earth; `spending.json`, built by `scripts/world-spending.mts`).
 - The heat layer is calibrated to Qloo's grid (`heat.ts`): an even field draws its own value at every zoom and latitude, and the scale is anchored to the act's hottest 5% of places.
 - An act Qloo doesn't know gets a stable ID from its name (`named.ts`), and every Qloo request takes the acts named as like it as the signal.
-- The map is MapLibre GL with OpenFreeMap's vector tiles, fetched through this server (`/map-tiles`, a Next.js rewrite), so the content policy stays same-origin. The landing page, the info pages and the PDF deck draw a still map on the server instead (`StaticMap.tsx`, Natural Earth land from world-atlas).
+- The map is MapLibre GL with OpenFreeMap's vector tiles, fetched through this server (`/map-tiles`, a Next.js rewrite), so the content policy stays same-origin. The landing page, the info pages and the PDF deck draw a still map on the server instead (`StaticMap.tsx`, Natural Earth land from world-atlas). The hero's background is a WebGL shader of moving contour lines with a blue scan (`HeroLines.tsx`). How it works' maps are the same live map, moving on their own in a loop (`MapLoop.tsx`). That section follows one example tour with looping pieces of the interface, tied to the scroll by GSAP's ScrollTrigger, with Lenis for smooth scrolling (`HowOnScroll.tsx`).
 - The writer (`writer.ts`) sees only scored results with their IDs. A draft that names a city or brand outside the plan, or states a money figure or percentage, is replaced by a plain template, and the plan says so. Without a language model, the pitch, the hold requests and the follow-ups are plain templates drafted from the plan's facts, and the tour team says it needs a key.
 - Plans never change: a change makes a new plan, and the tour keeps its first plan's ID, so where each venue and sponsor stands carries over (`tracker.ts`). Tours, statuses and what's remembered about acts are kept per browser, by a visitor cookie (`saved.ts`, `tracker.ts`).
 - Each stage streams to the page as it starts. Per-visitor and daily limits protect the Qloo quota.
@@ -178,6 +178,6 @@ The landing page's photos are in `public/images/photos/`, listed with their alt 
 
 ## Credits
 
-Afinlo is independent and isn't a Qloo product. Map data © OpenStreetMap contributors, tiles by OpenFreeMap; city and country data (GDP per head, from World Bank figures) from Natural Earth.
+Afinlo is independent and isn't a Qloo product. Map data © OpenStreetMap contributors, tiles by OpenFreeMap; city and country data (GDP per head, from World Bank figures) from Natural Earth. The hero's noise is webgl-noise by Ian McEwan, Ashima Arts, and stegu (MIT).
 
 Apache 2.0: see [LICENSE](LICENSE) and [NOTICE](NOTICE).

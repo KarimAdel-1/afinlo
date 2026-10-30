@@ -1,8 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import { Wordmark } from "@/components/Wordmark";
 
-/** The website's footer: the pages, where the data comes from, and what Fan Heat is and isn't. */
+/** The website's footer: the pages, and where the data comes from. */
 export function SiteFooter() {
   const groups = [
     {
@@ -57,15 +57,13 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="af2-footer-signature" aria-hidden="true">
-        afinlo
+        <Image src="/brand/afinlo-logo-tight.png" alt="" width={1712} height={410} sizes="(max-width: 1120px) 100vw, 1120px" />
       </div>
       <div className="af2-footer-bottom">
-        <span>© {new Date().getFullYear()} Afinlo, independent and not a Qloo product.</span>
-        <span>Fan Heat is audience taste affinity, not ticket demand.</span>
-        <Link href="/how-it-works">
-          How the numbers are made
-          <ArrowUpRight size={13} />
-        </Link>
+        <span>© {new Date().getFullYear()} Afinlo</span>
+        <a href="https://qloo.devpost.com" target="_blank" rel="noopener noreferrer">
+          Built for the Qloo Hackathon
+        </a>
       </div>
     </footer>
   );

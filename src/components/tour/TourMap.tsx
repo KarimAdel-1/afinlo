@@ -29,8 +29,8 @@ export interface MapSpot {
   lon: number;
 }
 
-const OPENFREEMAP = "https://tiles.openfreemap.org";
-const STYLE = "/map-tiles/styles/positron";
+export const OPENFREEMAP = "https://tiles.openfreemap.org";
+export const STYLE = "/map-tiles/styles/positron";
 
 /**
  * The real map: OpenFreeMap's vector tiles (through this server), Qloo's heatmap as a heat layer, the route as lines
@@ -279,7 +279,7 @@ export function TourMap({
 }
 
 /** The basemap in Afinlo's colours: a pale canvas, lavender water, quiet labels. */
-function tune(m: MapLibre) {
+export function tune(m: MapLibre) {
   const set = (layer: string, prop: PaintProperty, value: unknown) => {
     if (!m.getLayer(layer)) return;
     try {
@@ -309,7 +309,7 @@ function tune(m: MapLibre) {
 }
 
 /** The style's first label layer: the heat goes under the labels, so place names stay readable. */
-const firstLabel = (m: MapLibre) => m.getStyle().layers.find((l) => l.type === "symbol")?.id;
+export const firstLabel = (m: MapLibre) => m.getStyle().layers.find((l) => l.type === "symbol")?.id;
 
 /** Frames the route, or the heat when there's no route, or the world. */
 function fit(m: MapLibre, maplibre: typeof import("maplibre-gl"), places: { lat: number; lon: number }[], points: [number, number, number][], duration = 0) {

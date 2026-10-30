@@ -407,42 +407,6 @@
 }
 
 /* Home: the hero's search bar and the map card */
-.hl-home-search {
-  max-width: 640px;
-  margin: 0 auto;
-  text-align: left;
-}
-.hl-home-search form {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 8px 8px 24px;
-  border-radius: 100px;
-  background: #fff;
-  border: 1px solid #e2e1ea;
-  box-shadow: 0 20px 44px -30px rgba(38, 42, 63, 0.5);
-}
-.hl-home-search form:focus-within {
-  border-color: var(--hl-blue);
-  box-shadow: 0 0 0 4px rgba(67, 54, 255, 0.12), 0 20px 44px -30px rgba(38, 42, 63, 0.5);
-}
-.hl-home-search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 18px;
-  color: var(--hl-ink);
-  padding: 10px 0;
-}
-.hl-home-search input:focus-visible {
-  outline: none;
-}
-.hl-home-search form > svg {
-  color: var(--hl-subtle);
-  flex-shrink: 0;
-}
 .hl-picks {
   display: flex;
   flex-wrap: wrap;
@@ -475,16 +439,6 @@
 }
 .hl-pick i.comic {
   background: #b9d000;
-}
-.hl-hero-map {
-  position: relative;
-  z-index: 3;
-  width: min(560px, calc(100% - 32px));
-  margin: 0 auto;
-  border-radius: 28px;
-  background: #fff;
-  padding: 10px;
-  box-shadow: 0 30px 70px -40px rgba(36, 32, 67, 0.45);
 }
 
 /* Plan a tour */
@@ -1982,12 +1936,6 @@
   .hl-big-search input {
     font-size: 17px;
   }
-  .hl-home-search form {
-    padding-left: 18px;
-  }
-  .hl-home-search .hl-button span {
-    display: none;
-  }
   .hl-refine-form {
     flex-direction: column;
   }
@@ -2001,8 +1949,517 @@
     height: 240px;
   }
 }
+/* A tour on the real map, moving on its own (MapLoop.tsx). Nothing on it takes the pointer, so the page scrolls past it. */
+.hl-loop {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #dcdcf5;
+  pointer-events: none;
+}
+.hl-loop-canvas {
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.7s ease-out;
+}
+.hl-loop.ready .hl-loop-canvas {
+  opacity: 1;
+}
+.hl-loop-credit {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  line-height: 1.3;
+  color: rgba(38, 42, 63, 0.62);
+  pointer-events: auto;
+}
+.hl-loop-pin {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 9px;
+  background: var(--hl-ink);
+  box-shadow: 0 6px 14px -6px rgba(38, 42, 63, 0.6);
+  font-family: var(--font-display), sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 0.3s,
+    transform 0.5s cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+.hl-loop-pin.lime {
+  background: #efff8a;
+  color: #3f4a00;
+}
+.hl-loop-pin.on {
+  opacity: 1;
+  transform: none;
+}
+
+/* The landing page's How it works: the steps scroll past on the left, and the one being read loops on the right. */
+.hl-how {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 56px;
+  align-items: start;
+}
+.hl-how-step {
+  display: flex;
+  min-height: 64vh;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+.hl-how-step h3 {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(32px, 3.6vw, 44px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+.hl-how-step p {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--hl-muted);
+}
+.hl-how-stage {
+  position: sticky;
+  top: max(92px, calc(50svh - 280px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.hl-how-panel {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  opacity: 0;
+}
+.hl-how-panel[data-active="true"] {
+  visibility: visible;
+  opacity: 1;
+}
+/* Only the step being read runs, and it starts from the beginning when it comes up. */
+.hl-how-panel:not([data-active="true"]) * {
+  animation: none;
+}
+.hl-how-card {
+  position: relative;
+  display: flex;
+  height: min(560px, calc(100svh - 112px));
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--hl-paper);
+  padding: 10px;
+  box-shadow: 0 30px 70px -40px rgba(36, 32, 67, 0.45);
+}
+.hl-how-card.pad {
+  justify-content: center;
+  padding: 24px;
+}
+/* Name the act */
+.hl-how-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 7px 7px 20px;
+  border: 1px solid #e2e1ea;
+  border-radius: 100px;
+  background: #fff;
+  color: var(--hl-subtle);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.hl-how-field.on {
+  border-color: var(--hl-blue);
+  box-shadow: 0 0 0 4px rgba(67, 54, 255, 0.12);
+}
+.hl-how-field > svg {
+  flex-shrink: 0;
+}
+.hl-how-field > span:first-of-type {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 17px;
+  white-space: nowrap;
+  color: var(--hl-ink);
+}
+.hl-how-field > span.empty {
+  color: var(--hl-subtle);
+}
+.hl-how-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 1px;
+  background: var(--hl-blue);
+  vertical-align: -0.16em;
+}
+.hl-how-rows {
+  display: grid;
+  gap: 8px;
+}
+.hl-how-rows .hl-result-row {
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s,
+    background 0.25s;
+}
+.hl-how-rows .hl-result-row.on {
+  border-color: var(--hl-blue);
+  background: #fbfbff;
+}
+.hl-how-cursor {
+  position: absolute;
+  color: var(--hl-ink);
+  fill: #fff;
+  transition: transform 0.12s;
+}
+.hl-how-cursor.down {
+  transform: scale(0.85);
+}
+/* See where the fans are, and get the route */
+.hl-how-map {
+  min-height: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  border: 1px solid var(--hl-line);
+  border-radius: 20px;
+}
+.hl-how-card > .hl-how-list {
+  flex-shrink: 0;
+}
+.hl-how-window {
+  --visible: 3;
+  height: 232px;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: opacity 0.2s;
+}
+.hl-how-window .hl-how-list {
+  transform: translateY(calc(max(0, var(--shown) - var(--visible)) * -80px));
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hl-how-number {
+  background: var(--hl-ink);
+}
+.hl-how-number.lime {
+  background: #efff8a;
+  color: #3f4a00;
+}
+/* Book the venues */
+.hl-how-head {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--hl-muted);
+}
+.hl-how-head b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+  color: var(--hl-ink);
+}
+.hl-how-list,
+.hl-how-sponsors {
+  display: grid;
+  gap: 8px;
+}
+.hl-how-list li,
+.hl-how-sponsors li {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--hl-line);
+  border-radius: 20px;
+  background: #fff;
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hl-how-sponsors li {
+  padding: 8px 12px;
+}
+.hl-how-list li > span:not(.hl-tile),
+.hl-how-sponsors li > span:not(.hl-tile) {
+  flex: 1;
+}
+.hl-how-list li > span:not(.hl-tile) b,
+.hl-how-sponsors li > span:not(.hl-tile) b {
+  display: block;
+  overflow: hidden;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hl-how-list small,
+.hl-how-sponsors small {
+  display: block;
+  font-size: 13px;
+  color: var(--hl-muted);
+}
+.hl-how-list em {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 100px;
+  background: var(--hl-soft);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--hl-muted);
+  transition:
+    background 0.25s,
+    color 0.25s;
+}
+.hl-how-list em.s-1 {
+  background: #e7e5ff;
+  color: var(--hl-blue-ink);
+}
+.hl-how-list em.s-2 {
+  background: #efff8a;
+  color: #3f4a00;
+}
+.hl-how-list em.s-3 {
+  background: var(--hl-ink);
+  color: #fff;
+}
+/* Fund the tour */
+.hl-how-draft {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--hl-soft);
+  transition: opacity 0.3s;
+}
+.hl-how-draft small {
+  font-size: 13px;
+  color: var(--hl-muted);
+}
+.hl-how-draft p {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-line;
+  color: var(--hl-muted);
+}
+.hl-how-copy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 100px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--hl-ink);
+}
+.hl-how-copy.on {
+  background: var(--hl-ink);
+  color: #fff;
+}
+/* Ask your tour team */
+.hl-how-chat {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.hl-how-chat > * {
+  animation: hl-how-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.hl-how-chat > p {
+  flex-shrink: 0;
+  color: var(--hl-ink);
+}
+.hl-how-chat > p.user {
+  max-width: 85%;
+  align-self: flex-end;
+  padding: 9px 15px;
+  border-radius: 18px;
+  background: var(--hl-ink);
+  color: #fff;
+}
+.hl-how-chat ol {
+  display: grid;
+  flex-shrink: 0;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--hl-muted);
+}
+.hl-how-chat li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.hl-how-change {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--hl-line);
+  border-radius: 18px;
+}
+.hl-how-change > svg {
+  flex-shrink: 0;
+  color: var(--hl-blue);
+}
+.hl-how-change > span {
+  min-width: 0;
+  flex: 1;
+}
+.hl-how-change b,
+.hl-how-change small {
+  display: block;
+}
+.hl-how-change small {
+  font-size: 13px;
+  color: var(--hl-muted);
+}
+.hl-how-change em {
+  flex-shrink: 0;
+  padding: 7px 16px;
+  border-radius: 100px;
+  background: var(--hl-blue);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
+  color: #fff;
+}
+.hl-how-change em.on {
+  background: var(--hl-ink);
+}
+@keyframes hl-how-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.hl-how-ask {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 7px 7px 18px;
+  border: 1px solid #e2e1ea;
+  border-radius: 100px;
+  font-size: 15px;
+  transition: border-color 0.2s;
+}
+.hl-how-ask.on {
+  border-color: var(--hl-blue);
+}
+.hl-how-ask > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.hl-how-ask > span.empty {
+  color: var(--hl-subtle);
+}
+.hl-how-ask i {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hl-blue);
+  color: #fff;
+}
+@media (max-width: 1080px) {
+  .hl-how {
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+    gap: 32px;
+  }
+  .hl-how-step p {
+    font-size: 16px;
+  }
+}
+@media (max-width: 980px) {
+  .hl-how-list em {
+    display: none;
+  }
+}
+/* A short screen, such as a phone on its side: fewer rows, so the map keeps its room. */
+@media (max-height: 640px) {
+  .hl-how-window {
+    --visible: 2;
+    height: 152px;
+  }
+  .hl-how-card > .hl-how-list li:nth-child(n + 3) {
+    display: none;
+  }
+  .hl-how-card.pad {
+    padding: 12px;
+  }
+}
+/* A tall narrow screen: the step's piece of the app stays at the top, and the text scrolls under it. The same rule is STACKED in HowOnScroll.tsx. */
+@media (max-width: 860px) and (min-height: 560px) {
+  .hl-how {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .hl-how-stage {
+    z-index: 2;
+    top: 76px;
+    order: -1;
+    padding-bottom: 12px;
+    background: var(--hl-canvas);
+  }
+  .hl-how-card {
+    height: clamp(300px, 50svh, 460px);
+  }
+  .hl-how-card.pad {
+    padding: 12px;
+  }
+  .hl-how-window {
+    --visible: 2;
+    height: 152px;
+  }
+  .hl-how-card > .hl-how-list li:nth-child(n + 3) {
+    display: none;
+  }
+  .hl-how-field .hl-button,
+  .hl-how-rows .hl-result-row small,
+  .hl-how-rows .hl-result-row > svg {
+    display: none;
+  }
+  .hl-how-step {
+    min-height: 46svh;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .hl-spin,
+  .hl-spin:not(.hl-how-card *),
   .hl-scan .hl-hex-base {
     animation: none;
   }
