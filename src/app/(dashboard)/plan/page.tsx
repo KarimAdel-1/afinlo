@@ -5,7 +5,8 @@ import "@/components/tour/tour.css";
 import "@/components/tour/brief.css";
 import { qlooId } from "@/core/tour/types";
 import { setting } from "@/lib/settings";
-import { actById, qlooClient } from "@/platform/tour/qloo";
+import { briefStart } from "@/platform/tour/acts";
+import { knownBrowser } from "@/platform/tour/http";
 import { examplePlans } from "@/platform/tour/store";
 
 export const metadata: Metadata = {
@@ -17,7 +18,15 @@ export default async function NewTourPage({ searchParams }: PageProps<"/plan">) 
   const { q, act: actId } = await searchParams;
   // An act chosen elsewhere (an act's page, a brand's matches) starts the brief at where to tour.
   const id = qlooId.safeParse(actId);
-  const act = id.success ? await actById(qlooClient(), id.data, []).catch(() => undefined) : undefined;
+  const start: Awaited<ReturnType<typeof briefStart>> = id.success ? await briefStart(await knownBrowser(), id.data).catch(() => ({})) : {};
   const examples = await examplePlans().catch(() => []);
-  return <Brief qloo={!!setting("QLOO_API_KEY")} initialQuery={typeof q === "string" ? q.slice(0, 80) : ""} initialAct={act} picks={examples.slice(0, 4).map((e) => e.act.name)} />;
+  return (
+    <Brief
+      qloo={!!setting("QLOO_API_KEY")}
+      initialQuery={(start.query ?? (typeof q === "string" ? q : "")).slice(0, 80)}
+      initialAct={start.act}
+      initialLike={start.like}
+      picks={examples.slice(0, 4).map((e) => e.act.name)}
+    />
+  );
 }

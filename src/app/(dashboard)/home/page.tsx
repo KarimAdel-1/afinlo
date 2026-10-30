@@ -12,7 +12,7 @@ import type { Plan } from "@/core/tour/types";
 import { knownBrowser } from "@/platform/tour/http";
 import { savedResults } from "@/platform/tour/saved";
 import { examplePlans } from "@/platform/tour/store";
-import { tourOf, tracksFor } from "@/platform/tour/tracker";
+import { rememberedActs, tourOf, tracksFor } from "@/platform/tour/tracker";
 
 export const metadata: Metadata = { title: "Your tours", robots: { index: false } };
 
@@ -22,19 +22,21 @@ const routeOf = (p: Pick<Plan, "route" | "cities">) => p.route.map((r) => p.citi
 /** Home: what needs doing across the tours, then the tours themselves; for a first visit, a start and the examples. */
 export default async function HomePage() {
   const owner = await knownBrowser();
-  const [saved, examples] = await Promise.all([savedResults(owner), examplePlans().catch(() => [])]);
-  const plans = saved.flatMap((s) => (s.kind === "plan" ? [{ plan: s.plan, savedAt: s.savedAt }] : []));
+  const [plans, examples, acts] = await Promise.all([savedResults(owner), examplePlans().catch(() => []), rememberedActs(owner)]);
   const tracks = await tracksFor(owner, plans.map((p) => tourOf(p.plan)));
+  // Brands an act has said no to aren't pitched on any of its tours.
+  const turnedDown = new Map(acts.map((a) => [a.act.id, a.memory.excludeBrandIds ?? []]));
+  const next = (plan: Plan) => nextUp(plan, tracks.get(tourOf(plan)) ?? [], { turnedDown: turnedDown.get(plan.act.id) });
   const tours: TourCard[] = plans.map(({ plan, savedAt }) => ({
     id: plan.id,
     act: { name: plan.act.name, image: plan.act.image },
     title: titleOf(plan),
     route: routeOf(plan),
-    progress: nextUp(plan, tracks.get(tourOf(plan)) ?? []).progress,
+    progress: next(plan).progress,
     savedAt,
   }));
   const tasks: TourTask[] = plans
-    .flatMap(({ plan }) => nextUp(plan, tracks.get(tourOf(plan)) ?? []).tasks.map((t) => ({ ...t, planId: plan.id, act: plan.act.name })))
+    .flatMap(({ plan }) => next(plan).tasks.map((t) => ({ ...t, planId: plan.id, act: plan.act.name })))
     .sort((a, b) => Number(!!b.overdue) - Number(!!a.overdue))
     .slice(0, 6);
   const mine = new Set(plans.map((p) => p.plan.id));

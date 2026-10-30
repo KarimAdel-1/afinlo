@@ -6,7 +6,7 @@ import { geoMercator, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import land from "world-atlas/land-50m.json";
-import { arc } from "@/core/tour/geo";
+import { flightPath } from "@/core/tour/geo";
 import { cellBox, cellDensity, heatColor, heatGrid } from "@/core/tour/heat";
 
 export interface StaticStop {
@@ -79,7 +79,7 @@ export function StaticMap({
   const blur = sizes.length ? (sizes.reduce((a, b) => a + b, 0) / sizes.length) * 0.55 : 1;
   const legs = stops.slice(1).map((s, i) => {
     const from = stops[i];
-    const line = s.leg === "fly" ? arc(from, s, 24) : [[from.lon, from.lat], [s.lon, s.lat]];
+    const line = s.leg === "fly" ? flightPath(from, s, 24) : [[from.lon, from.lat], [s.lon, s.lat]];
     return { fly: s.leg === "fly", d: "M" + line.map(([lon, lat]) => at(lon, lat).map((v) => v.toFixed(1)).join(",")).join("L") };
   });
   const id = label.replace(/[^a-z0-9]/gi, "").slice(0, 24) || "map";

@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { setting } from "@/lib/settings";
 import { TasteError } from "@/core/taste/types";
-import { TourError, type TourStage } from "@/core/tour/types";
+import { TourError } from "@/core/tour/types";
 
 export const NO_STORE = { "Cache-Control": "private, no-store" };
 const VISITOR = "hl_visitor";
@@ -36,10 +36,14 @@ export async function knownBrowser() {
   return browserId((await cookies()).get(VISITOR)?.value);
 }
 
-/** The visitor, for the limits: their address behind a trusted proxy, otherwise this browser. */
+/**
+ * The visitor, for the limits: their address behind a trusted proxy, otherwise this browser. The address is the last
+ * in X-Forwarded-For, the one the proxy added: a proxy appends to what the browser sent, so the first is the browser's
+ * own word and could be anything.
+ */
 export async function visitorOf(request: Request) {
   const id = await browserOf();
-  const address = setting("TRUST_PROXY") ? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() : undefined;
+  const address = setting("TRUST_PROXY") ? request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() : undefined;
   return address ? `ip:${address}` : `v:${id}`;
 }
 
@@ -81,28 +85,4 @@ export async function bodyOf(request: Request, max = 4000): Promise<unknown> {
   const text = await request.text();
   if (text.length > max) throw new TourError("body_size", "This request is too large.", 413);
   return JSON.parse(text);
-}
-
-/**
- * Runs an agent and streams its progress as newline-delimited JSON: one line per stage as it's reached, then the
- * result's ID, or an error. A run is stopped after 110 seconds, or when the visitor leaves.
- */
-export function streamStages(request: Request, run: (onStage: (stage: TourStage) => void, signal: AbortSignal) => Promise<string>) {
-  const encoder = new TextEncoder();
-  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(110_000)]);
-  const body = new ReadableStream({
-    async start(controller) {
-      const send = (line: { stage?: TourStage; id?: string; error?: string }) => controller.enqueue(encoder.encode(JSON.stringify(line) + "\n"));
-      try {
-        send({ id: await run((stage) => send({ stage }), signal) });
-      } catch (error) {
-        const e = error instanceof TourError ? error : undefined;
-        if (!e) console.error("Run failed:", error);
-        send({ error: e?.message ?? (signal.aborted ? "That took too long, so it was stopped. Please try again." : "Afinlo couldn't finish this. Nothing was invented; please try again.") });
-      } finally {
-        controller.close();
-      }
-    },
-  });
-  return new Response(body, { headers: { ...NO_STORE, "Content-Type": "application/x-ndjson" } });
 }

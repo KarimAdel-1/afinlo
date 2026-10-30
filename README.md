@@ -21,18 +21,18 @@ Independent musicians and comedians pick tour cities by instinct and pitch the s
 
 1. **The brief.** Find the act in Qloo. Afinlo looks at where its fans are across the whole world (one Qloo heatmap) and shows it on a map, with the regions and countries ranked. Pick the whole world, a region or countries, then say what matters: how many shows, big cities or hidden markets first, where the tour starts, which sponsor categories to pitch and which never to. For an act Qloo doesn't know yet, name two or three acts it's like: the tour is planned from their fans, and labelled predicted.
 2. **The tour,** as a workspace: the plan on the left in five tabs, a real map on the right (Qloo's heatmap as a heat layer, the route with drives and flights, numbered stops).
-   - **Plan:** the route stop by stop.
-     - Each stop shows its Fan Heat and how it's reached: a drive up to 650 km, a flight beyond.
+   - **Plan:** why this route, then the route stop by stop.
+     - **Why this route:** the route's average Fan Heat next to that of the area's biggest cities, the tour a booker with no taste data would play. Morgan Wallen's North America tour scores 93 against 47.
+     - Each stop shows its Fan Heat and how it's reached: a drive up to 650 km, a flight beyond. Each can be skipped.
      - Every tour plays the act's hottest market.
      - No two stops are within 150 km, as a promoter's radius clause would have it.
      - A world tour keeps shows 400 km apart and gives no country more than a quarter of them.
-     - Next to the route: the strong cities not on it, and quick changes (shorter, longer, hidden markets first, one sponsor category, skip a city).
-     - **Against the biggest cities:** the route's average Fan Heat next to that of the area's biggest cities, the tour a booker with no taste data would play. Morgan Wallen's North America tour scores 93 against 47.
+     - Any other change (more or fewer shows, a city added, hidden markets first, another area) is asked of the tour team.
    - **Book:** in each city, the music venues or comedy clubs these fans love, pinned on the map, each with a drafted hold request and where it stands (to contact, asked, on hold, confirmed, passed).
    - **Fund:** the brands these fans love, ranked by Sponsor Fit, each with its evidence, a drafted pitch and where it stands (to send, sent, replied, signed, passed); the five-page PDF deck.
    - **Promote:** who the fans are (taste, age and gender skew), the podcasts, shows, books and films they love, openers whose fans overlap, and in each city the local businesses to partner with and the places fans go.
    - **Next up:** what to do now, in order: a venue for every stop, a pitch for the best sponsors, a follow-up when a pitch has had no answer for five days, a reply when it has.
-3. **Your tour team.** "Ask your tour team", from any tab, opens a conversation inside the tour. A manager agent hands each message to the specialists it needs: a route planner, a venue booker, a sponsor scout and a promoter. It replies from what they found. Ask why a city is on the route, ask for a change you apply in one click ("make it 8 shows"), or ask for a pitch in Spanish or posts for a city. See [The tour team](#the-tour-team).
+3. **Your tour team.** A message bar at the foot of every tab opens into a conversation inside the tour (on a phone, a sheet along the bottom). A manager agent hands each message to the specialists it needs: a route planner, a venue booker, a sponsor scout and a promoter. It replies from what they found. Ask why a city is on the route, ask for a change you apply in one click ("make it 8 shows"), or ask for a pitch in Spanish or posts for a city. See [The tour team](#the-tour-team).
 4. **It remembers.** Each act's choices (where it tours, how long) and every no (a sponsor category, a brand, a city) carry into its next tour. **Home** shows every tour and what needs doing across them; **Acts** shows each act and what Afinlo remembers about it.
 
 Nothing needs an account: tours, statuses and what's remembered are kept per browser. When Qloo has no location data for an act, the plan is estimated from acts with overlapping audiences and labelled so; when there's nothing to go on, it says so instead of guessing.
@@ -131,7 +131,7 @@ flowchart LR
 
 ## Run it locally
 
-Requirements: Node.js 24+, PostgreSQL 15+, a Qloo hackathon API key, Chrome or Edge for PDF decks (found in the usual install places, or set `PDF_BROWSER`), and internet access for the map tiles. A language model is optional. With `OPENAI_API_KEY` set, the AI writer drafts the pitch, a typed change ("swap Denver for somewhere near Seattle") becomes new filters, and the tour team answers. Without it, everything else works, drafts are templates, and the tour team says it needs a key.
+Requirements: Node.js 24+, PostgreSQL 15+, a Qloo hackathon API key, Chrome or Edge for PDF decks (found in the usual install places, or set `PDF_BROWSER`), and internet access for the map tiles. A language model is optional. With `OPENAI_API_KEY` set, the AI writer drafts the pitch and the tour team answers. Without it, everything else works, drafts are templates, and the tour team says it needs a key.
 
 ```sh
 npm ci
@@ -148,7 +148,7 @@ The tables are made on first use, the tour team's conversations included. Keys s
 ```sh
 npm run typecheck
 npm run lint
-npm test           # 50 tests: scoring and world tours, regions and areas, the heat layer against MapLibre's kernel, Next up, the agent, the tour team against scripted models, brand matches, pairings and city guides, all against fixture Qloo; tours and statuses kept per browser
+npm test           # 52 tests: scoring and world tours, regions and areas, the heat layer against MapLibre's kernel, Next up, the agent, the tour team against scripted models, city guides and the Qloo client, all against fixture Qloo; tours, statuses and act memory kept per browser
 npm run build
 npm run eval       # the tour team against the live model: 21 messages, each reply checked (needs OPENAI_API_KEY; a few cents)
 ```
@@ -167,10 +167,6 @@ The app's **Does it work?** page reports what's measured, and nothing that isn't
 The tour team is measured by `npm run eval`, which writes each reply and its checks to `docs/evaluation/manager-eval.json`. Its first run against the live model is pending.
 
 Limits: Fan Heat is taste affinity, not ticket demand. A sponsor match means a brand's customers love the act, not that it will sponsor; Qloo's brand results are mostly global brands, and its location signal leans them toward the tour's area. Qloo tags few venues in some cities (Berlin, Cairo), so Afinlo falls back to live-music and event venues there, and says so when there are none. Some acts have little Qloo data. Demographics are aggregate; Afinlo uses no personal data and sends nothing on anyone's behalf.
-
-## Other tools on the same data
-
-Two earlier tools are still in the codebase, outside the main navigation: **For brands** (`/brands`: the acts whose fans love a brand, and where both audiences meet) and **Co-headliners** (`/co-headline`: two acts' shared cities and a double-bill route). Both cover the United States.
 
 ## Photos
 

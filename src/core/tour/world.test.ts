@@ -1,7 +1,7 @@
 // Where tours go, and what a tour needs next: the areas Qloo is asked about, regions, the map's points, Next up. Pure.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { arc, heatPoints, keepCities } from "./geo";
+import { arc, flightPath, heatPoints, keepCities } from "./geo";
 import { FOLLOW_UP_DAYS, nextUp } from "./next";
 import { placeOf, REGIONS, US, where, whereKey, whereLabel, WORLD } from "./regions";
 import type { CityHeat, Plan, Track } from "./types";
@@ -47,6 +47,17 @@ test("the map draws the stronger half of Qloo's cells; flights follow the globe"
   assert.ok(Math.max(...flight.map(([, lat]) => lat)) > 51.5, "a great circle bows toward the pole");
   const pacific = arc({ lat: 35.7, lon: 139.7 }, { lat: 37.8, lon: -122.4 });
   assert.ok(pacific.every((p, i) => !i || Math.abs(p[0] - pacific[i - 1][0]) < 30), "no jump across the antimeridian");
+  // The maps show one world, with edges. A flight whose great circle crosses an edge (Los Angeles to Sydney, over the
+  // Pacific) is drawn across the map instead, from one stop to the other; every other flight is its great circle.
+  const la = { lat: 34.1, lon: -118.2 },
+    sydney = { lat: -33.9, lon: 151.2 };
+  const across = flightPath(la, sydney);
+  assert.ok(across.every(([lon, lat]) => lon >= -180 && lon <= 180 && lat >= -85 && lat <= 85), "it stays on the map");
+  assert.deepEqual(across[0], [la.lon, la.lat]);
+  assert.deepEqual(across.at(-1), [sydney.lon, sydney.lat]);
+  assert.ok(across.every((p, i) => !i || Math.abs(p[0] - across[i - 1][0]) < 30), "one curve, no jump from edge to edge");
+  assert.ok(Math.max(...across.map(([, lat]) => lat)) > la.lat, "bowed upward, like the other flights");
+  assert.deepEqual(flightPath({ lat: 40.7, lon: -74 }, { lat: 51.5, lon: -0.1 }), flight, "a flight that stays on the map is its great circle");
   const many = Array.from({ length: 100 }, (_, i) => ({ id: `c${i}` }) as CityHeat);
   assert.equal(keepCities(many, [{ cityId: "c95", legKm: 0 }]).length, 81, "the strongest 80, and every stop");
 });
@@ -77,9 +88,13 @@ test("Next up: a venue for every stop, the best sponsors pitched, a follow-up af
   } as unknown as Plan;
   const now = Date.parse("2026-10-27T12:00:00Z");
   const days = (n: number) => new Date(now - n * 86_400_000).toISOString();
-  const fresh = nextUp(plan, [], now);
+  const fresh = nextUp(plan, [], { now });
   assert.deepEqual(fresh.tasks.map((t) => t.id), ["venue:a", "venue:b", "venue:c", "pitch:s1", "pitch:s2", "pitch:s3"], "three pitches at a time");
   assert.deepEqual(fresh.progress, { stops: 3, venuesConfirmed: 0, sponsors: 4, pitchesSent: 0, signed: 0 });
+  // A brand the act turned down after the plan was made isn't pitched, or counted among the ones to pitch.
+  const without = nextUp(plan, [], { now, turnedDown: ["s1"] });
+  assert.deepEqual(without.tasks.filter((t) => t.kind === "pitch").map((t) => t.id), ["pitch:s2", "pitch:s3", "pitch:s4"]);
+  assert.equal(without.progress.sponsors, 3);
   const tracks: Track[] = [
     { kind: "venue", itemId: "v1", cityId: "a", status: "confirmed", note: "", updatedAt: days(1) },
     { kind: "venue", itemId: "v2", cityId: "b", status: "hold", note: "", updatedAt: days(1) },
@@ -89,7 +104,7 @@ test("Next up: a venue for every stop, the best sponsors pitched, a follow-up af
     { kind: "sponsor", itemId: "s3", status: "replied", note: "", updatedAt: days(1) },
     { kind: "sponsor", itemId: "s4", status: "signed", note: "", updatedAt: days(1) },
   ];
-  const later = nextUp(plan, tracks, now);
+  const later = nextUp(plan, tracks, { now });
   assert.deepEqual(later.tasks.map((t) => t.id), ["follow:s1", "reply:s3", "confirm:b"], "overdue first, then the hold to confirm; an asked venue and a fresh pitch wait");
   assert.match(later.tasks[0].detail, /6 days ago/);
   assert.deepEqual(later.progress, { stops: 3, venuesConfirmed: 1, sponsors: 4, pitchesSent: 4, signed: 1 });

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FIXTURE_ACT_ID, testBrowser, testDatabase } from "@/testing/database";
-import type { Act } from "@/core/tour/types";
+import { MAX_SKIPPED_CITIES, MAX_TURNED_DOWN_BRANDS, planInput, SPONSOR_CATEGORIES, type Act } from "@/core/tour/types";
 import { actMemory, rememberAct, rememberedActs, setTrack, tourOf, tracksFor } from "./tracker";
 
 testDatabase();
@@ -50,4 +50,17 @@ test("what's remembered about an act: the latest tour's choices, and every no un
   assert.deepEqual((await actMemory(browser, ACT.id))?.excludeBrandIds, [], "until it's taken back");
   assert.deepEqual((await rememberedActs(browser)).map((r) => r.act.name), ["Fixture Star"]);
   assert.equal(await actMemory(testBrowser(), ACT.id), undefined, "another browser remembers nothing");
+});
+
+test("an act's memory keeps as many no's as a plan can carry, the newest, so its next tour can always be made", async () => {
+  const browser = testBrowser();
+  const cities = (from: number, n: number) => Array.from({ length: n }, (_, i) => `us-city${from + i}`);
+  const brands = (from: number, n: number) => Array.from({ length: n }, (_, i) => `CCCCCCCC-0000-4000-8000-${String(from + i).padStart(12, "0")}`);
+  await rememberAct(browser, ACT, { excludeCityIds: cities(0, 15), excludeBrandIds: brands(0, 30) });
+  await rememberAct(browser, ACT, { excludeCityIds: cities(15, 10), excludeBrandIds: brands(30, 20) });
+  const memory = (await actMemory(browser, ACT.id))!;
+  assert.deepEqual(memory.excludeCityIds, cities(5, MAX_SKIPPED_CITIES));
+  assert.deepEqual(memory.excludeBrandIds, brands(10, MAX_TURNED_DOWN_BRANDS));
+  assert.ok(planInput.safeParse({ actId: ACT.id, excludeCityIds: memory.excludeCityIds, excludeBrandIds: memory.excludeBrandIds }).success, "a plan takes it as it is");
+  assert.ok(planInput.safeParse({ actId: ACT.id, avoid: Object.keys(SPONSOR_CATEGORIES) }).success, "and the act may rule out every sponsor category");
 });

@@ -18,7 +18,7 @@ Afinlo is an AI tour manager that knows your fans. Tell it which artist or comed
 
 1. **The brief.** Find the act in Qloo. Afinlo maps where its fans are across the world, from one Qloo heatmap, and ranks the regions and countries. Then pick a region or countries, how many shows, big cities or hidden markets first, where the tour starts, which sponsor categories to pitch and which never to.
 2. **The tour,** as a workspace: the plan in five tabs beside a real map (Qloo's heatmap as a heat layer, the route, numbered stops).
-   - **Plan:** the route stop by stop, each with its Fan Heat and how it's reached (a drive up to 650 km, a flight beyond). No two stops are within 150 km, as a promoter's radius clause would have it. The strong cities left off the route are shown too, with quick changes: shorter, longer, hidden markets first, skip a city.
+   - **Plan:** why this route (its fans against the biggest cities'), then the route stop by stop, each with its Fan Heat and how it's reached (a drive up to 650 km, a flight beyond). No two stops are within 150 km, as a promoter's radius clause would have it. Any stop can be skipped; any other change is asked of the tour team.
    - **Book:** in each city, the music venues or comedy clubs these fans love, each with a drafted hold request and where it stands.
    - **Fund:** the brands these fans love, ranked by Sponsor Fit, each with its evidence and a drafted pitch, and a five-page PDF deck.
    - **Promote:** who the fans are (taste, age and gender skew), the podcasts, shows, books and films they love, openers whose fans overlap, and local partners in each city.
@@ -37,7 +37,7 @@ Every city, venue, brand and act in a tour comes from Qloo, with its Qloo ID, an
 - **Scoring,** in plain TypeScript and unit-tested: Fan Heat per city from Qloo's heatmap cells, hidden markets, routing with drives and flights, and Sponsor Fit from Qloo affinity, category and brand size.
 - **The world:** 2,737 cities of 90,000 people or more in 184 countries (Natural Earth), one per metro, grouped into 11 touring regions. Each area is asked of Qloo as one shape.
 - **The map:** MapLibre GL with OpenFreeMap's vector tiles, served through our own server.
-- **Writing:** [If a model is connected: a language model writes the pitch and the emails and turns a typed change ("swap Denver for somewhere near Seattle") into filters. Its drafts are checked, and one that names a city or brand outside the plan, or states a money figure, is replaced by a template. If no model is connected: the pitch, hold requests and follow-ups are drafted as templates from the plan's facts.]
+- **Writing:** [If a model is connected: a language model writes the pitch and the emails, and runs the tour team, which changes a tour on request. Its drafts are checked, and one that names a city or brand outside the plan, or states a money figure, is replaced by a template. If no model is connected: the pitch, hold requests and follow-ups are drafted as templates from the plan's facts.]
 - **Stack:** Next.js 16, TypeScript, PostgreSQL, LangGraph, MapLibre GL. [Hosted on Vercel.]
 
 ## What we built during the hackathon

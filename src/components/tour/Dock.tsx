@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FlaskConical, House, Info, Menu, Mic2, Plus, Workflow, X, type LucideIcon } from "lucide-react";
+import { House, Menu, Mic2, Plus, X, type LucideIcon } from "lucide-react";
 import { Wordmark } from "@/components/Wordmark";
 
 interface Page {
@@ -15,17 +15,12 @@ interface Page {
   tone: string;
 }
 
-/** The pages, in the dock's groups: the tours, then how it all works. */
+/** The pages, in the dock's groups. The website's pages (How it works, Does it work?, About) are the website's alone. */
 const GROUPS: Page[][] = [
   [
     { label: "Home", href: "/home", icon: House, tone: "blue" },
     { label: "New tour", href: "/plan", icon: Plus, tone: "orange" },
     { label: "Acts", href: "/acts", icon: Mic2, tone: "violet" },
-  ],
-  [
-    { label: "How it works", href: "/how-it-works", icon: Workflow, tone: "ink" },
-    { label: "Does it work?", href: "/does-it-work", icon: FlaskConical, tone: "lime" },
-    { label: "About", href: "/about", icon: Info, tone: "teal" },
   ],
 ];
 /** An icon's size in the dock's units: 5 at rest, 8 under the pointer, about 7 and 6 one and two icons away, as in Osmo's dock. */

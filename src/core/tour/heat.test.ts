@@ -2,7 +2,7 @@
 // zoom and latitude, never all one colour, and anchored at the act's hottest places. Pure.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cellBox, heatColor, heatGrid, heatIntensity, heatLevels, heatPaint, heatRadius, heatSpots, HEAT_RAMP, stretchFix, type HeatGrid } from "./heat";
+import { boxPaint, cellBox, heatApart, heatBoxes, heatColor, heatGrid, heatIntensity, heatLevels, heatPaint, heatRadius, heatSpots, HEAT_RAMP, stretchFix, type HeatGrid } from "./heat";
 
 const GH3 = { dLat: 1.40625, dLon: 1.40625 };
 const GH4 = { dLat: 0.17578125, dLon: 0.3515625 };
@@ -108,6 +108,39 @@ test("zoomed out, the scale is anchored at the act's hottest places, so a contin
   assert.ok(Math.abs(anchored - 0.85) < 0.12, `anchored, the cities read near the top: ${anchored.toFixed(2)}`);
   assert.ok(levels.every((l) => l >= 0.5 && l <= 6), "within bounds");
   assert.ok(Math.abs(drawn(points, GH4, 7, city, levels) - 0.85) < 0.12, "and close in, the same");
+});
+
+test("zoomed in past where the blur can span the grid, the cells show as the boxes they are, not as dots", () => {
+  /** An `interpolate` over the zoom, worked out at a zoom. */
+  const atZoom = (expr: unknown[], zoom: number) => {
+    const stops = expr.slice(3) as number[];
+    for (let i = 2; i < stops.length; i += 2)
+      if (zoom <= stops[i]) return stops[i - 1] + ((stops[i + 1] - stops[i - 1]) * (zoom - stops[i - 2])) / (stops[i] - stops[i - 2]);
+    return stops.at(-1)!;
+  };
+  for (const grid of [GH3, GH4, GH5]) {
+    const apart = heatApart(grid);
+    const points = field(grid, 30, -100, 5, 5, () => 0.8);
+    const cell = centre(grid, 30, -100, 2, 2),
+      next = centre(grid, 30, -100, 2, 3);
+    const between = { lat: cell.lat, lon: (cell.lon + next.lon) / 2 };
+    // Up to it, neighbouring blurs still make one field; a zoom past it, the blur alone would leave gaps: dots.
+    const before = Math.floor(apart * 2) / 2,
+      past = Math.ceil((apart + 1) * 2) / 2;
+    assert.ok(drawn(points, grid, before, between) > 0.8 * drawn(points, grid, before, cell), `${grid.dLat}: one field up to it`);
+    assert.ok(drawn(points, grid, past, between) < 0.5 * drawn(points, grid, past, cell), `${grid.dLat}: the blur alone leaves dots past it`);
+    // So over that zoom the blur fades out and the boxes in.
+    const blur = heatPaint(grid)["heatmap-opacity"],
+      boxes = boxPaint(grid)["fill-opacity"];
+    assert.ok(atZoom(blur, apart) > 0 && atZoom(blur, apart + 1) === 0);
+    assert.ok(atZoom(boxes, apart) === 0 && atZoom(boxes, apart + 1) > 0);
+    assert.ok(atZoom(blur, apart - 2) > 0 && atZoom(boxes, apart - 2) === 0, "zoomed out, only the blur");
+    // Each box is its cell, in its own density.
+    const box = heatBoxes(points, grid)[0];
+    const [south, west, north, east] = cellBox(points[0][0], points[0][1], grid);
+    assert.deepEqual(box.ring, [[west, south], [east, south], [east, north], [west, north], [west, south]]);
+    assert.equal(box.density, 0.8 * 0.8);
+  }
 });
 
 test("both maps share one colour scale, and the live map's paint is set every half zoom level", () => {

@@ -52,3 +52,25 @@ export function arc(a: { lat: number; lon: number }, b: { lat: number; lon: numb
   }
   return out;
 }
+
+/**
+ * A flight as the maps draw it. The maps show one world, with edges: a great circle that crosses an edge (out in the
+ * Pacific, Los Angeles to Sydney) would leave at one side and come back at the other. Such a flight is drawn as a curve
+ * across the map instead, from one stop to the other, bowed upward like the rest. Every other flight is its great circle.
+ * Only the drawing changes: a leg's distance is still the great circle's.
+ */
+export function flightPath(a: { lat: number; lon: number }, b: { lat: number; lon: number }, steps = 32): [number, number][] {
+  const great = arc(a, b, steps);
+  if (great.every(([lon]) => lon >= -180 && lon <= 180)) return great;
+  // A quadratic curve in longitude and latitude, its middle lifted off the straight line by a sixth of its length.
+  const dLon = b.lon - a.lon,
+    dLat = b.lat - a.lat,
+    length = Math.hypot(dLon, dLat);
+  const [nLon, nLat] = dLon >= 0 ? [-dLat / length, dLon / length] : [dLat / length, -dLon / length];
+  const lift = length / 6;
+  const c = { lon: (a.lon + b.lon) / 2 + nLon * lift, lat: Math.min(80, Math.max(-80, (a.lat + b.lat) / 2 + nLat * lift)) };
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const t = i / steps;
+    return [(1 - t) ** 2 * a.lon + 2 * (1 - t) * t * c.lon + t ** 2 * b.lon, (1 - t) ** 2 * a.lat + 2 * (1 - t) * t * c.lat + t ** 2 * b.lat];
+  });
+}

@@ -30,9 +30,9 @@ const SETTINGS = {
   },
   /** OpenAI's API key. Optional: without it, the pitch and emails are templates. */
   OPENAI_API_KEY: text,
-  /** New plans, brand matches and pairings the whole server makes in 24 hours. */
+  /** New plans the whole server makes in 24 hours. */
   DAILY_PLANS: count(300),
-  /** New plans, brand matches and pairings one visitor can make in an hour. */
+  /** New plans one visitor can make in an hour. */
   HOURLY_PLANS: count(8),
   /** Messages to tour managers the whole server answers in 24 hours. */
   DAILY_CHAT: count(600),

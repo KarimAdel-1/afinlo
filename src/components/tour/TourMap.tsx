@@ -6,8 +6,8 @@ import type { GeoJSONSource, Map as MapLibre, Marker, Popup } from "maplibre-gl"
 /** A paint property's name, as MapLibre types them. */
 type PaintProperty = Parameters<MapLibre["setPaintProperty"]>[1];
 import "maplibre-gl/dist/maplibre-gl.css";
-import { arc } from "@/core/tour/geo";
-import { heatGrid, heatLevels, heatPaint, heatSpots } from "@/core/tour/heat";
+import { flightPath } from "@/core/tour/geo";
+import { boxPaint, heatBoxes, heatGrid, heatLevels, heatPaint, heatSpots } from "@/core/tour/heat";
 
 /** A stop on the route, in order. `leg` is how it's reached from the stop before (or from home). */
 export interface MapStop {
@@ -94,6 +94,9 @@ export function TourMap({
           style: `${location.origin}${STYLE}`,
           center: [0, 25],
           zoom: 1.2,
+          // One world, with edges: no copies either side, and MapLibre then keeps the view from panning past them. (No
+          // maxBounds of ±180°: MapLibre 6 wraps 180° to −180°, reads a world zero wide, and fails.)
+          renderWorldCopies: false,
           attributionControl: { compact: true },
           dragRotate: false,
           pitchWithRotate: false,
@@ -114,7 +117,9 @@ export function TourMap({
         map.current = m;
         resize = new ResizeObserver(() => m.resize());
         resize.observe(box.current);
-      } catch {
+      } catch (error) {
+        // Most often there's no WebGL; whatever it was, it's in the console.
+        console.error("The map couldn't start:", error);
         if (!cancelled) setState("failed");
       }
     })();
@@ -128,7 +133,8 @@ export function TourMap({
     };
   }, [interactive]);
 
-  // The heat layer: Qloo's cells blurred into a field sized to their grid, on a scale anchored at the hottest places (heat.ts).
+  // The heat layer: Qloo's cells blurred into a field sized to their grid, on a scale anchored at the hottest places;
+  // zoomed in, where a blur can't span the grid, the cells as their boxes instead (heat.ts).
   useEffect(() => {
     const m = map.current;
     if (state !== "ready" || !m) return;
@@ -137,14 +143,23 @@ export function TourMap({
       type: "FeatureCollection" as const,
       features: heatSpots(points, grid).map(([lat, lon, density, stretch]) => ({ type: "Feature" as const, properties: { density, stretch }, geometry: { type: "Point" as const, coordinates: [lon, lat] } })),
     };
-    const paint = heatPaint(grid, heatLevels(points, grid));
-    const source = m.getSource("heat") as GeoJSONSource | undefined;
-    if (source) {
-      void source.setData(data);
-      for (const [name, value] of Object.entries(paint)) m.setPaintProperty("heat", name as PaintProperty, value as never);
-    } else {
-      m.addSource("heat", { type: "geojson", data });
-      m.addLayer({ id: "heat", type: "heatmap", source: "heat", paint } as Parameters<MapLibre["addLayer"]>[0], firstLabel(m));
+    const boxes = {
+      type: "FeatureCollection" as const,
+      features: heatBoxes(points, grid).map(({ density, ring }) => ({ type: "Feature" as const, properties: { density }, geometry: { type: "Polygon" as const, coordinates: [ring] } })),
+    };
+    const layers = [
+      { id: "heat-boxes", type: "fill", data: boxes, paint: boxPaint(grid) },
+      { id: "heat", type: "heatmap", data, paint: heatPaint(grid, heatLevels(points, grid)) },
+    ] as const;
+    for (const layer of layers) {
+      const source = m.getSource(layer.id) as GeoJSONSource | undefined;
+      if (source) {
+        void source.setData(layer.data);
+        for (const [name, value] of Object.entries(layer.paint)) m.setPaintProperty(layer.id, name as PaintProperty, value as never);
+      } else {
+        m.addSource(layer.id, { type: "geojson", data: layer.data });
+        m.addLayer({ id: layer.id, type: layer.type, source: layer.id, paint: layer.paint } as Parameters<MapLibre["addLayer"]>[0], firstLabel(m));
+      }
     }
   }, [state, points]);
 
@@ -157,7 +172,7 @@ export function TourMap({
     const legs = stops.flatMap((s, i) => {
       const from = i ? stops[i - 1] : home;
       if (!from) return [];
-      const line = s.leg === "fly" ? arc(from, s) : ([[from.lon, from.lat], [s.lon, s.lat]] as [number, number][]);
+      const line = s.leg === "fly" ? flightPath(from, s) : ([[from.lon, from.lat], [s.lon, s.lat]] as [number, number][]);
       return [{ type: "Feature" as const, properties: { mode: s.leg ?? "drive" }, geometry: { type: "LineString" as const, coordinates: line } }];
     });
     const data = { type: "FeatureCollection" as const, features: legs };
@@ -201,7 +216,7 @@ export function TourMap({
       el.title = `Home: ${home.name}`;
       markers.current.set("home", { marker: new maplibre.Marker({ element: holder(el) }).setLngLat([home.lon, home.lat]).addTo(m), el });
     }
-    if (!focus) fit(m, maplibre, [...stops, ...(home ? [home] : [])], points);
+    if (!focus) fit(m, maplibre, [...(home ? [home] : []), ...stops], points);
 
     function show(s: MapStop) {
       popup.current?.remove();

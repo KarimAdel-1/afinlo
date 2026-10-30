@@ -80,31 +80,6 @@
   background: var(--hl-lavender);
   color: var(--hl-blue);
 }
-.hl-picks-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-  color: var(--hl-subtle);
-  font-size: 13px;
-}
-.hl-chip-button {
-  padding: 7px 14px;
-  border: 1px solid var(--hl-line);
-  border-radius: 100px;
-  background: #fff;
-  color: var(--hl-ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-.hl-chip-button:hover {
-  border-color: var(--hl-ink);
-}
-.hl-chip-button svg {
-  vertical-align: -2px;
-  margin-left: 4px;
-}
 .hl-brief .hl-results {
   margin-top: 16px;
 }

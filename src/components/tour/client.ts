@@ -8,16 +8,14 @@ export async function postJson<T>(url: string, body: object): Promise<T> {
   return json as T;
 }
 
-/**
- * Starts a run (a plan, a brand match, a co-headliner pairing) and reports each stage as the agent reaches it.
- * Resolves with the result's ID.
- */
-export async function streamRun(url: string, input: object, onStage: (s: TourStage) => void): Promise<string> {
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+/** Starts a plan and reports each stage as the agent reaches it. Resolves with the plan's ID. */
+export async function streamPlan(input: PlanInput & { parentId?: string }, onStage: (s: TourStage) => void): Promise<string> {
+  const res = await fetch("/api/tour/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  // A plan already made for this request comes back at once, as plain JSON.
   if (res.headers.get("content-type")?.includes("application/json")) {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json.error || "That didn't work. Please try again.");
-    return (json.planId ?? json.id) as string;
+    return json.planId as string;
   }
   if (!res.ok || !res.body) throw new Error("Afinlo couldn't start this. Please try again.");
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -28,10 +26,10 @@ export async function streamRun(url: string, input: object, onStage: (s: TourSta
     const lines = buffer.split("\n");
     buffer = done ? "" : lines.pop()!;
     for (const line of lines.filter(Boolean)) {
-      const event = JSON.parse(line) as { stage?: TourStage; planId?: string; id?: string; error?: string };
+      const event = JSON.parse(line) as { stage?: TourStage; planId?: string; error?: string };
       if (event.stage) onStage(event.stage);
       if (event.error) throw new Error(event.error);
-      if (event.planId ?? event.id) return (event.planId ?? event.id)!;
+      if (event.planId) return event.planId;
     }
     if (done) throw new Error("The connection closed before it finished. Please try again.");
   }
@@ -59,9 +57,6 @@ export async function streamChat(planId: string, message: string, onEvent: (e: M
   }
 }
 
-/** Starts a plan and reports each stage as the agent reaches it. Resolves with the plan's ID. */
-export const streamPlan = (input: PlanInput & { parentId?: string }, onStage: (s: TourStage) => void) => streamRun("/api/tour/plan", input, onStage);
-
 export function stageLabel(s: TourStage): string {
   switch (s.stage) {
     case "resolving":
@@ -84,13 +79,5 @@ export function stageLabel(s: TourStage): string {
       return `Finding venues and local spots in ${s.cities.join(", ")}`;
     case "writing":
       return "Writing the pitch pack";
-    case "acts":
-      return `Finding the ${s.kinds === "comedy" ? "comedians" : s.kinds === "music" ? "artists" : "artists and comedians"} whose fans love this brand`;
-    case "overlap":
-      return `Mapping where both audiences are strongest, for ${s.count} acts`;
-    case "pair":
-      return `Comparing ${s.a}'s and ${s.b}'s audiences, city by city`;
-    case "route":
-      return "Planning the double-bill route (plain code, no AI)";
   }
 }

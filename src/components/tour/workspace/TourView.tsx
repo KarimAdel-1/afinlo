@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BadgeCheck, Bookmark, BookmarkCheck, CalendarCheck, Download, Handshake, Link2, ListChecks, LoaderCircle, Megaphone, MessagesSquare, Route as RouteIcon, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, Bookmark, BookmarkCheck, CalendarCheck, Download, Handshake, Link2, ListChecks, LoaderCircle, Megaphone, Route as RouteIcon, X } from "lucide-react";
 import { nextUp } from "@/core/tour/next";
 import type { ActMemory, TourStage, Plan, PlanInput, Track } from "@/core/tour/types";
 import { AgentTrace } from "../AgentTrace";
@@ -17,11 +17,12 @@ import { NextTab } from "./NextTab";
 import { DraftDialog } from "./parts";
 import { PlanTab } from "./PlanTab";
 import { PromoteTab } from "./PromoteTab";
-import { TeamTab } from "./TeamTab";
+import { TeamChat } from "./TeamChat";
 import { useGuides, useTracks } from "./state";
 
-export type Tab = "plan" | "team" | "book" | "fund" | "promote" | "next";
-const TABS: { id: Exclude<Tab, "team">; label: string; icon: typeof RouteIcon }[] = [
+export type Tab = "plan" | "book" | "fund" | "promote" | "next";
+/** The tabs. The tour team isn't one: it's at the foot of every tab (TeamChat). */
+const TABS: { id: Tab; label: string; icon: typeof RouteIcon }[] = [
   { id: "plan", label: "Plan", icon: RouteIcon },
   { id: "book", label: "Book", icon: CalendarCheck },
   { id: "fund", label: "Fund", icon: Handshake },
@@ -46,8 +47,8 @@ export interface TourActions {
 
 /**
  * A tour, as a workspace: the plan on the left in five tabs (the route, booking the venues, funding it with sponsors,
- * reaching the fans, what to do next), the tour team to talk to from any of them, and the real map on the right,
- * following whichever stop is in hand.
+ * reaching the fans, what to do next), the real map on the right, following whichever stop is in hand, and the tour
+ * team's message bar at the foot of every tab.
  */
 export function TourView({
   plan,
@@ -55,7 +56,6 @@ export function TourView({
   home,
   memory,
   saved: initiallySaved,
-  ai,
   initialTab = "plan",
   initialStop,
 }: {
@@ -64,7 +64,6 @@ export function TourView({
   home?: { name: string; lat: number; lon: number };
   memory?: ActMemory;
   saved: boolean;
-  ai: boolean;
   initialTab?: Tab;
   initialStop?: string;
 }) {
@@ -86,7 +85,7 @@ export function TourView({
   const routeCities = plan.route.map((r) => city(r.cityId)).filter((c): c is Plan["cities"][number] => !!c);
   const totalKm = plan.route.reduce((s, r) => s + r.legKm, 0);
   const flights = plan.route.filter((r) => r.mode === "fly").length;
-  const { tasks, progress } = useMemo(() => nextUp(plan, tracks), [plan, tracks]);
+  const { tasks, progress } = useMemo(() => nextUp(plan, tracks, { turnedDown }), [plan, tracks, turnedDown]);
 
   // The stop in hand loads its places when a tab needs them.
   useEffect(() => {
@@ -139,7 +138,7 @@ export function TourView({
     pointAt: setActiveSpot,
     remember: async (add) => {
       if (add.excludeBrandIds) setTurnedDown((v) => [...new Set([...v, ...add.excludeBrandIds!])]);
-      await postJson(`/api/tour/acts/${plan.act.id}/memory`, { add }).catch(() => undefined);
+      await postJson(`/api/tour/acts/${plan.act.id}/memory`, { add, planId: plan.id }).catch(() => undefined);
     },
   };
 
@@ -190,7 +189,7 @@ export function TourView({
             <ArrowLeft size={16} aria-hidden /> Your tours
           </Link>
           <div className="hl-tour-id">
-            <Avatar name={plan.act.name} image={plan.act.image} size={72} />
+            <Avatar name={plan.act.name} image={plan.act.image} size={56} />
             <div style={{ minWidth: 0 }}>
               <h1>{plan.act.name}</h1>
               <p>
@@ -200,38 +199,41 @@ export function TourView({
               </p>
             </div>
           </div>
-          <div className="hl-tour-chips">
-            {plan.signal.basis === "act" ? (
-              <span className="hl-chip hl-chip-good">
-                <BadgeCheck size={14} aria-hidden /> From {plan.act.name}&apos;s own Qloo data
+          {/* Whose data it is and how far the tour has got, on one line. */}
+          <div className="hl-tour-meta">
+            <div className="hl-tour-chips">
+              {plan.signal.basis === "act" ? (
+                <span className="hl-chip hl-chip-good">
+                  <BadgeCheck size={14} aria-hidden /> From {plan.act.name}&apos;s own Qloo data
+                </span>
+              ) : plan.signal.basis === "named" ? (
+                <span className="hl-chip hl-chip-warn">
+                  <AlertTriangle size={14} aria-hidden /> Predicted from {plan.signal.similar.map((a) => a.name).join(", ")}
+                </span>
+              ) : (
+                <span className="hl-chip hl-chip-warn">
+                  <AlertTriangle size={14} aria-hidden /> Estimated from similar acts
+                </span>
+              )}
+              {plan.example && <span className="hl-chip hl-chip-blue">Example</span>}
+            </div>
+            <div className="hl-tour-progress" aria-label="Progress">
+              <span>
+                <b>
+                  {progress.venuesConfirmed}/{progress.stops}
+                </b>{" "}
+                venues confirmed
               </span>
-            ) : plan.signal.basis === "named" ? (
-              <span className="hl-chip hl-chip-warn">
-                <AlertTriangle size={14} aria-hidden /> Predicted from {plan.signal.similar.map((a) => a.name).join(", ")}
+              <span>
+                <b>
+                  {progress.pitchesSent}/{progress.sponsors}
+                </b>{" "}
+                pitches out
               </span>
-            ) : (
-              <span className="hl-chip hl-chip-warn">
-                <AlertTriangle size={14} aria-hidden /> Estimated from similar acts
+              <span>
+                <b>{progress.signed}</b> signed
               </span>
-            )}
-            {plan.example && <span className="hl-chip hl-chip-blue">Example</span>}
-          </div>
-          <div className="hl-tour-progress" aria-label="Progress">
-            <span>
-              <b>
-                {progress.venuesConfirmed}/{progress.stops}
-              </b>{" "}
-              venues confirmed
-            </span>
-            <span>
-              <b>
-                {progress.pitchesSent}/{progress.sponsors}
-              </b>{" "}
-              pitches out
-            </span>
-            <span>
-              <b>{progress.signed}</b> signed
-            </span>
+            </div>
           </div>
           <div className="hl-tour-actions">
             <button type="button" className="hl-button hl-button-quiet hl-button-small" onClick={() => void copyLink()}>
@@ -289,22 +291,12 @@ export function TourView({
         )}
 
         <div className="hl-tour-body">
-          {tab === "plan" && <PlanTab plan={plan} routeCities={routeCities} active={active} onActive={setActive} actions={actions} ai={ai} running={!!run && !run.error} />}
-          {tab === "team" && <TeamTab plan={plan} actions={actions} onTrack={savedTrack} />}
+          {tab === "plan" && <PlanTab plan={plan} routeCities={routeCities} active={active} onActive={setActive} actions={actions} running={!!run && !run.error} />}
           {tab === "book" && <BookTab plan={plan} stop={stop} onStop={setStop} guide={guide} reload={(id) => void load(id, true)} actions={actions} />}
           {tab === "fund" && <FundTab plan={plan} turnedDown={turnedDown} actions={actions} deck={{ busy: deck.busy, download: () => void downloadDeck() }} />}
           {tab === "promote" && <PromoteTab plan={plan} stop={stop} onStop={setStop} guide={guide} reload={(id) => void load(id, true)} />}
           {tab === "next" && <NextTab plan={plan} tasks={tasks} progress={progress} actions={actions} />}
         </div>
-        {tab !== "team" && (
-          <button type="button" className="hl-team-launch" onClick={() => actions.goTo("team")}>
-            <MessagesSquare size={18} aria-hidden />
-            <span>
-              <b>Ask your tour team</b>
-              <small>The route, venues, sponsors and fans</small>
-            </span>
-          </button>
-        )}
       </div>
 
       <div className="hl-tour-map">
@@ -353,6 +345,7 @@ export function TourView({
           </div>
         </div>
       )}
+      <TeamChat plan={plan} actions={actions} onTrack={savedTrack} />
       {draft && <DraftDialog draft={draft.draft} done={draft.done} onClose={() => setDraft(undefined)} />}
     </div>
   );

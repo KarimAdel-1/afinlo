@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Globe2, LoaderCircle, MapPin, Search, Sparkles, X } from "lucide-react";
 import { newActOf } from "@/core/tour/named";
 import { regionById, whereLabel, type RegionId, type Where } from "@/core/tour/regions";
-import { SPONSOR_CATEGORIES, type Act, type ActMemory, type TourStage, type SponsorCategory } from "@/core/tour/types";
+import { MAX_SKIPPED_CITIES, MAX_TURNED_DOWN_BRANDS, SPONSOR_CATEGORIES, type Act, type ActMemory, type TourStage, type SponsorCategory } from "@/core/tour/types";
 import { AgentTrace } from "./AgentTrace";
 import { Avatar } from "./Avatar";
 import { postJson, streamPlan } from "./client";
@@ -42,7 +42,7 @@ function viewOf(region: RegionId) {
  * A new tour, as a brief: who's touring (from Qloo), where (from a first look at where their fans are, worldwide),
  * and what matters (length, focus, home, sponsors to pitch and never pitch). Afinlo remembers each act's answers.
  */
-export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: boolean; initialQuery?: string; initialAct?: Act; picks: string[] }) {
+export function Brief({ qloo, initialQuery = "", initialAct, initialLike, picks }: { qloo: boolean; initialQuery?: string; initialAct?: Act; initialLike?: Act[]; picks: string[] }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(initialAct ? "where" : "act");
   const [query, setQuery] = useState(initialQuery);
@@ -51,7 +51,7 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
   const [act, setAct] = useState<Act | undefined>(initialAct);
   // An act Qloo doesn't know: being named, and the acts it's like once it is.
   const [naming, setNaming] = useState(false);
-  const [like, setLike] = useState<Act[]>([]);
+  const [like, setLike] = useState<Act[]>(initialLike ?? []);
   const [scan, setScan] = useState<Scan>();
   const [scanError, setScanError] = useState("");
   const [area, setArea] = useState<Where>();
@@ -114,6 +114,8 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
         if (cancelled || !m) return;
         setMemory(m);
         if (m.where) setArea(m.where);
+        // Used only while it's in the area chosen (homeId).
+        if (m.homeCityId) setHome(m.homeCityId);
         if (m.stops) setStops(m.stops);
         if (m.focus) setFocus(m.focus);
         if (m.categories) setCategories(m.categories);
@@ -180,8 +182,9 @@ export function Brief({ qloo, initialQuery = "", initialAct, picks }: { qloo: bo
           homeCityId: homeId || undefined,
           categories,
           avoid: avoid.filter((c) => !categories.includes(c)),
-          excludeBrandIds: memory?.excludeBrandIds ?? [],
-          excludeCityIds: memory?.excludeCityIds ?? [],
+          // The newest, as many as a plan carries: a memory kept before that limit may hold more.
+          excludeBrandIds: (memory?.excludeBrandIds ?? []).slice(-MAX_TURNED_DOWN_BRANDS),
+          excludeCityIds: (memory?.excludeCityIds ?? []).slice(-MAX_SKIPPED_CITIES),
         },
         (s) => setStages((v) => [...v, s]),
       );

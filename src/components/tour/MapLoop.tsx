@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GeoJSONSource, LngLatBoundsLike, Map as MapLibre } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { arc } from "@/core/tour/geo";
+import { flightPath } from "@/core/tour/geo";
 import { heatGrid, heatLevels, heatPaint, heatSpots } from "@/core/tour/heat";
 import { CLEAR_S, OVERVIEW_S, reelDelay } from "./reel";
 import type { StaticStop } from "./StaticMap";
@@ -32,7 +32,7 @@ export function MapLoop({ points = [], stops = [], area, t, active, label }: { p
   const [ready, setReady] = useState(false);
   const route = !area && stops.length > 0;
 
-  const legs = useMemo(() => stops.slice(1).map((s, i) => ({ mode: s.leg ?? "drive", line: (s.leg === "fly" ? arc(stops[i], s) : [[stops[i].lon, stops[i].lat], [s.lon, s.lat]]) as [number, number][] })), [stops]);
+  const legs = useMemo(() => stops.slice(1).map((s, i) => ({ mode: s.leg ?? "drive", line: (s.leg === "fly" ? flightPath(stops[i], s) : [[stops[i].lon, stops[i].lat], [s.lon, s.lat]]) as [number, number][] })), [stops]);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +50,8 @@ export function MapLoop({ points = [], stops = [], area, t, active, label }: { p
         ...(places.length ? { bounds: bounds as LngLatBoundsLike, fitBoundsOptions: { padding: 44, maxZoom: 7 } } : { center: [10, 25] as [number, number], zoom: 1 }),
         attributionControl: false,
         interactive: false,
+        // One world, like the tour's own map.
+        renderWorldCopies: false,
         fadeDuration: 150,
         transformRequest: (url) => (url.startsWith(OPENFREEMAP) ? { url: `${location.origin}/map-tiles${url.slice(OPENFREEMAP.length)}` } : undefined),
       });

@@ -3,7 +3,7 @@ import { TourError, planInput, type TourStage, type Plan } from "@/core/tour/typ
 import { planTour } from "@/platform/tour/agent";
 import { browserOf, errorResponse, forbidden, fromOurPages, NO_STORE, visitorOf } from "@/platform/tour/http";
 import { keepSaved, removeSaved } from "@/platform/tour/saved";
-import { claimPlanSlot, getPlan, recentPlanFor, savePlan } from "@/platform/tour/store";
+import { claimPlanSlot, getPlan, reusablePlan, savePlan } from "@/platform/tour/store";
 import { rememberAct } from "@/platform/tour/tracker";
 
 export const runtime = "nodejs";
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     input = parsed.data.newAct ? { ...parsed.data, actId: newActId(parsed.data.newAct.name) } : parsed.data;
     owner = await browserOf();
     parent = input.parentId ? await getPlan(input.parentId) : undefined;
-    const reuse = await recentPlanFor(input);
+    const reuse = await reusablePlan(input, parent);
     if (reuse) {
       await keep(owner, reuse, parent);
       return Response.json({ planId: reuse.id, reused: true }, { headers: NO_STORE });

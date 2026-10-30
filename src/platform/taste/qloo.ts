@@ -225,8 +225,10 @@ export class QlooClient {
       ? createHash("sha256").update(endpoint + "?" + new URLSearchParams(Object.entries(parameters).sort(([a], [b]) => a.localeCompare(b))).toString()).digest("hex")
       : "";
     try {
+      // The cache saves quota, nothing more: when it can't be read, Qloo is asked; when it can't be written, Qloo's
+      // answer still goes back. Either way it's logged, and never reported as Qloo failing.
       if (this.cache) {
-        const kept = await this.cache.get(cacheKey);
+        const kept = await this.cache.get(cacheKey).catch((error) => void console.error("Couldn't read the Qloo cache:", error));
         if (kept !== undefined) {
           trace.status = "ok";
           trace.cached = true;
@@ -300,10 +302,12 @@ export class QlooClient {
             502,
           );
         trace.status = "ok";
-        await this.cache?.set(cacheKey, body);
+        await this.cache?.set(cacheKey, body).catch((error) => console.error("Couldn't keep a Qloo answer in the cache:", error));
         return body;
       }
     } catch (error) {
+      // What went wrong stays in the server's log; the visitor gets the plain message.
+      if (!(error instanceof TasteError) && !signal?.aborted) console.error(`Qloo ${endpoint} failed:`, error);
       const safe =
         error instanceof TasteError
           ? error

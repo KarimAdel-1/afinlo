@@ -1,12 +1,10 @@
-// The language model's two jobs, neither of which chooses a result: the writer turns scored Qloo facts
-// into the pitch pack, and the planner turns a refinement message into new filters. The writer sees only the facts and
-// their IDs, and its output is checked: an unknown ID or an invented money figure sends the plan to the plain template
-// instead.
+// The pitch pack's writer, which chooses no result: it turns scored Qloo facts into the deck's text and the sponsor
+// emails. It sees only the facts and their IDs, and its output is checked: an unknown ID or an invented money figure
+// sends the plan to the plain template instead. (Changes to a tour are the tour team's: src/platform/manager.)
 import { z } from "zod";
 import { setting } from "@/lib/settings";
-import { placeOf, US } from "@/core/tour/regions";
-import { SPONSOR_CATEGORIES, sponsorCategory, type CityHeat, type Plan, type PitchPack, type PlanRequest, type SponsorCategory } from "@/core/tour/types";
-import { citiesIn } from "@/core/tour/world";
+import { placeOf } from "@/core/tour/regions";
+import type { CityHeat, Plan, PitchPack } from "@/core/tour/types";
 import { askJson, data, DATA_RULE, MODELS } from "./model";
 
 export type WriterFacts = Pick<Plan, "act" | "fanDna" | "sponsors" | "supportActs" | "signal"> & { route: CityHeat[]; stops: number };
@@ -155,62 +153,4 @@ export function matchCity(name: string, cities: { id: string; name: string; stat
   const named = cities.filter((c) => norm(c.name) === n);
   const where = rest?.toLowerCase();
   return (where ? named.find((c) => c.state?.toLowerCase().startsWith(where.slice(0, 4)) || c.country?.toLowerCase() === where) : undefined)?.id ?? named[0]?.id;
-}
-
-const refineSchema = z
-  .object({
-    categories: z.array(sponsorCategory).max(3),
-    stops: z.number().int().min(3).max(12),
-    excludeCities: z.array(z.string().max(80)).max(10),
-    homeCity: z.string().max(80),
-    focus: z.enum(["balanced", "hidden"]),
-    reply: z.string().max(300),
-  })
-  .strict();
-
-/**
- * The planner: reads a refinement ("only beverage brands", "swap Denver for something closer", "make it six cities")
- * and returns the new filters. It can only choose from the app's own categories and candidate cities.
- */
-export async function planRefinement(message: string, plan: Plan, signal?: AbortSignal): Promise<{ request: PlanRequest; reply: string }> {
-  const routeNames = plan.route.map((r) => plan.cities.find((c) => c.id === r.cityId)?.name).filter(Boolean);
-  // The cities it may name: the plan's own (strongest first), and for home, any city in the tour's area.
-  const area = citiesIn(plan.request.where ?? US);
-  const nameOf = (id?: string) => plan.cities.find((c) => c.id === id)?.name ?? area.find((c) => c.id === id)?.name;
-  const r = await askJson(
-    MODELS.planner,
-    `You adjust an Afinlo tour plan's filters from the user's message. Keep every filter the message doesn't change. categories: keys from the allowed list only. excludeCities and homeCity: names from the candidate city list only (homeCity empty when not given). focus is 'hidden' when the user wants lesser-known or less obvious markets. reply: one sentence saying what will change. ${DATA_RULE}`,
-    [
-      data(
-        "current",
-        JSON.stringify({
-          categories: plan.request.categories,
-          stops: plan.request.stops,
-          focus: plan.request.focus,
-          route: routeNames,
-          excluded: plan.request.excludeCityIds.map(nameOf).filter(Boolean),
-          home: nameOf(plan.request.homeCityId) ?? "",
-        }),
-      ),
-      data("allowed_categories", JSON.stringify(Object.fromEntries(Object.entries(SPONSOR_CATEGORIES).map(([k, v]) => [k, v.label])))),
-      data("candidate_cities", plan.cities.map((c) => c.name).join(", ")),
-      data("message", message),
-    ].join("\n"),
-    refineSchema,
-    "plan_change",
-    { maxTokens: 500, signal },
-  );
-  const homeCities = area.map((c) => ({ ...c, state: c.admin1 }));
-  const ids = (names: string[]) => names.map((n) => matchCity(n, plan.cities)).filter((id): id is string => !!id);
-  return {
-    request: {
-      ...plan.request,
-      categories: [...new Set(r.categories as SponsorCategory[])],
-      stops: r.stops,
-      excludeCityIds: [...new Set([...plan.request.excludeCityIds, ...ids(r.excludeCities)])],
-      homeCityId: r.homeCity ? (matchCity(r.homeCity, homeCities) ?? plan.request.homeCityId) : plan.request.homeCityId,
-      focus: r.focus,
-    },
-    reply: r.reply,
-  };
 }

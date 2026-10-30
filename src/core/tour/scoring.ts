@@ -3,7 +3,7 @@ import { km } from "./geo";
 import type { Where } from "./regions";
 import spending from "./spending.json";
 import { countryAt, WORLD_CITIES, type WorldCity } from "./world";
-import type { Act, CityHeat, Confidence, MatchedAct, PairCity, Proof, RouteStop, SharedCity, Sponsor } from "./types";
+import type { CityHeat, Confidence, Proof, RouteStop, Sponsor } from "./types";
 
 export { km };
 
@@ -131,78 +131,6 @@ function markHidden(sorted: CityHeat[]) {
       c.hidden = true;
       hidden++;
     }
-}
-
-/**
- * Cities where two audiences meet, best first: each one's Fan Heat, and both together as their geometric mean, so a
- * city scores high only when both audiences are strong there.
- */
-export function sharedCities(a: CityHeat[], b: CityHeat[]): SharedCity[] {
-  const other = new Map(b.map((c) => [c.id, c.heat]));
-  return a
-    .flatMap((c) => {
-      const heat = other.get(c.id);
-      return heat === undefined ? [] : [{ cityId: c.id, a: c.heat, b: heat, together: Math.round(Math.sqrt(c.heat * heat)) }];
-    })
-    .sort((x, y) => y.together - x.together || y.a + y.b - (x.a + x.b));
-}
-
-const CONFIDENCE: Confidence[] = ["low", "medium", "high"];
-
-/**
- * The cities for a double bill: every city both acts have data for, with each act's Fan Heat; its heat is the two
- * together (their geometric mean). The tour score and hidden markets follow from that heat, as for one act.
- */
-export function pairCities(a: CityHeat[], b: CityHeat[]): PairCity[] {
-  const other = new Map(b.map((c) => [c.id, c]));
-  const rows = a.flatMap((c) => (other.has(c.id) ? [{ c, o: other.get(c.id)! }] : []));
-  if (!rows.length) return [];
-  const logs = rows.map(({ c }) => Math.log(c.population));
-  const minP = Math.min(...logs),
-    maxP = Math.max(...logs);
-  const out: PairCity[] = rows.map(({ c, o }) => {
-    const heat = Math.round(Math.sqrt(c.heat * o.heat));
-    return {
-      ...c,
-      affinity: Number(Math.sqrt(c.affinity * o.affinity).toFixed(4)),
-      cells: Math.min(c.cells, o.cells),
-      heat,
-      a: c.heat,
-      b: o.heat,
-      hidden: false,
-      tourScore: Math.round(0.75 * heat + 0.25 * scale(Math.log(c.population), minP, maxP)),
-      confidence: CONFIDENCE[Math.min(CONFIDENCE.indexOf(c.confidence), CONFIDENCE.indexOf(o.confidence))],
-    };
-  });
-  out.sort((x, y) => y.heat - x.heat || y.population - x.population);
-  markHidden(out);
-  return out;
-}
-
-/** How alike two acts' maps are: of the cities either is strong in (Fan Heat 60+), the share both are strong in. */
-export function mapOverlap(a: CityHeat[], b: CityHeat[], strong = 60) {
-  const sa = new Set(a.filter((c) => c.heat >= strong).map((c) => c.id));
-  const sb = new Set(b.filter((c) => c.heat >= strong).map((c) => c.id));
-  const either = new Set([...sa, ...sb]);
-  return either.size ? [...sa].filter((id) => sb.has(id)).length / either.size : 0;
-}
-
-/**
- * Brand Fit, 0–100, for the acts a brand's audience loves: like Sponsor Fit, Qloo's affinity scaled against the other
- * acts, times a size weight (household names are the hardest to book and the least distinctive). Duplicates merged.
- */
-export function scoreActs(found: { act: Act; affinity: number }[]): Omit<MatchedAct, "shared">[] {
-  const unique = [...found].sort((x, y) => y.affinity - x.affinity).filter((f, i, all) => all.findIndex((g) => g.act.id === f.act.id) === i);
-  if (!unique.length) return [];
-  const affinities = unique.map((f) => f.affinity);
-  const min = Math.min(...affinities),
-    max = Math.max(...affinities);
-  return unique
-    .map((f, i) => {
-      const tier = tierOf(f.act.popularity);
-      return { act: f.act, affinity: f.affinity, qlooRank: i + 1, tier, fit: Math.round((40 + 0.6 * scale(f.affinity, min, max)) * TIER_WEIGHT[tier]) };
-    })
-    .sort((x, y) => y.fit - x.fit || x.qlooRank - y.qlooRank);
 }
 
 /**

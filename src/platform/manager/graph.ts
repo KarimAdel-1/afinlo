@@ -31,11 +31,18 @@ export const LIMITS = {
   foldAt: 10,
 };
 
+type TurnCard = ManagerCard & { turn: string };
 export const ManagerState = Annotation.Root({
   ...MessagesAnnotation.spec,
   summary: Annotation<string>({ reducer: (_old, next) => next, default: () => "" }),
-  /** What the team made, each with its turn (the ID of the user's message it answered). */
-  cards: Annotation<(ManagerCard & { turn: string })[]>({ reducer: (a, b) => [...a, ...b], default: () => [] }),
+  /**
+   * What the team made, each with its turn (the ID of the user's message it answered). `{ keep }` keeps only those
+   * turns' cards: the others' turns have folded into the summary, where nothing shows their cards.
+   */
+  cards: Annotation<TurnCard[], TurnCard[] | { keep: string[] }>({
+    reducer: (a, b) => (Array.isArray(b) ? [...a, ...b] : a.filter((c) => b.keep.includes(c.turn))),
+    default: () => [],
+  }),
 });
 type State = typeof ManagerState.State;
 
@@ -90,13 +97,14 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
     const drop = [...broken, ...s.messages.filter((m) => isToolMessage(m) && brokenCalls.has(m.tool_call_id))];
     const kept = s.messages.filter((m) => !drop.includes(m));
     const starts = kept.flatMap((m, i) => (isHumanMessage(m) ? [i] : []));
-    const update: { messages: BaseMessage[]; summary?: string } = { messages: drop.map((m) => new RemoveMessage({ id: m.id! })) };
+    const update: { messages: BaseMessage[]; summary?: string; cards?: { keep: string[] } } = { messages: drop.map((m) => new RemoveMessage({ id: m.id! })) };
     if (starts.length > LIMITS.foldAt) {
       const old = kept.slice(0, starts[starts.length - LIMITS.keep]);
       const transcript = old.flatMap((m) => (isHumanMessage(m) ? [`User: ${textOf(m)}`] : isAIMessage(m) && !callsOf(m).length ? [`Manager: ${textOf(m)}`] : [])).join("\n");
       const folded = await models("summary").invoke([new SystemMessage(SUMMARY_PROMPT), new HumanMessage(data("conversation", `${s.summary ? `Earlier summary: ${s.summary}\n\n` : ""}${transcript}`))], { signal: desk.signal });
       update.summary = textOf(folded).slice(0, 1500);
       update.messages.push(...old.map((m) => new RemoveMessage({ id: m.id! })));
+      update.cards = { keep: kept.slice(old.length).flatMap((m) => (isHumanMessage(m) ? [m.id!] : [])) };
     }
     return update;
   };
@@ -112,9 +120,16 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
   };
 
   // The manager's tool calls, each to its node: a specialist, or the manager's own tools. No calls: the reply is done.
+  // Specialists take at most LIMITS.asks tasks a message, however many one round hands out; the rest are answered
+  // without them, so every call still has its answer.
   const dispatch = (s: State) => {
     const calls = callsOf(s.messages.at(-1));
-    return calls.length ? calls.map((call) => new Send(agentOf(call.name) ?? "own", { call })) : "collect";
+    if (!calls.length) return "collect";
+    let left = LIMITS.asks - thisTurn(s.messages).filter((m) => isToolMessage(m) && agentOf(m.name ?? "")).length;
+    return calls.map((call) => {
+      const agent = agentOf(call.name);
+      return !agent ? new Send("own", { call }) : left-- > 0 ? new Send(agent, { call }) : new Send("unasked", { call });
+    });
   };
 
   const ask = (agent: Specialist) => async (input: unknown) => {
@@ -144,6 +159,13 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
     return { messages: [new ToolMessage({ tool_call_id: call.id!, name: call.name, content })] };
   };
 
+  // A handoff past the limit. Marked as an error, so it isn't counted among the specialists who answered.
+  const unasked = async (input: unknown) => {
+    const { call } = input as { call: ToolCall };
+    const content = "Not asked: the team has taken all the tasks it can for this message. Reply from what you have, and say what's still open.";
+    return { messages: [new ToolMessage({ tool_call_id: call.id!, name: call.name, content, status: "error" })] };
+  };
+
   const collect = (s: State) => {
     const turn = s.messages.findLast((m) => isHumanMessage(m))?.id ?? "";
     return desk.made.length ? { cards: desk.made.map(({ card }) => ({ ...card, turn })) } : {};
@@ -157,15 +179,17 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
     .addNode("sponsors", ask("sponsors"))
     .addNode("promoter", ask("promoter"))
     .addNode("own", ownTools)
+    .addNode("unasked", unasked)
     .addNode("collect", collect)
     .addEdge(START, "fold")
     .addEdge("fold", "manager")
-    .addConditionalEdges("manager", dispatch, ["route", "venues", "sponsors", "promoter", "own", "collect"])
+    .addConditionalEdges("manager", dispatch, ["route", "venues", "sponsors", "promoter", "own", "unasked", "collect"])
     .addEdge("route", "manager")
     .addEdge("venues", "manager")
     .addEdge("sponsors", "manager")
     .addEdge("promoter", "manager")
     .addEdge("own", "manager")
+    .addEdge("unasked", "manager")
     .addEdge("collect", END);
   return graph.compile({ checkpointer, name: "tour-manager" });
 }

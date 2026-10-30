@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { cityId, TourError, qlooId, sponsorCategory } from "@/core/tour/types";
+import { actToRemember } from "@/platform/tour/acts";
 import { bodyOf, browserOf, errorResponse, forbidden, fromOurPages, knownBrowser, NO_STORE } from "@/platform/tour/http";
-import { actById, qlooClient } from "@/platform/tour/qloo";
+import { getPlan } from "@/platform/tour/store";
 import { actMemory, rememberAct } from "@/platform/tour/tracker";
 
 export const runtime = "nodejs";
@@ -18,6 +19,8 @@ const Body = z
   .object({
     add: z.object({ excludeBrandIds: list(qlooId), excludeCityIds: list(cityId), avoid: z.array(sponsorCategory).max(14).optional() }).strict().default({}),
     remove: z.object({ excludeBrandIds: list(qlooId), excludeCityIds: list(cityId), avoid: z.array(sponsorCategory).max(14).optional() }).strict().default({}),
+    /** The tour the no was said on: it knows the act when this browser doesn't yet. */
+    planId: z.string().max(40).optional(),
   })
   .strict();
 
@@ -30,7 +33,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/tour/acts/[
     if (!id.success || !parsed.success) throw new TourError("validation", "Check the request.");
     const owner = await browserOf();
     const before = await actMemory(owner, id.data);
-    const act = await actById(qlooClient(), id.data, []);
+    const plan = parsed.data.planId ? await getPlan(parsed.data.planId) : undefined;
+    const act = await actToRemember(owner, id.data, { plan });
     if (!act) throw new TourError("act_missing", "Qloo doesn't know that act.", 404);
     const { add, remove } = parsed.data;
     const minus = (have: string[] | undefined, take: string[] | undefined) => (have ?? []).filter((v) => !take?.includes(v));

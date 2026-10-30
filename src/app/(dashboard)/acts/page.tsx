@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Acts", robots: { index: false } };
 export default async function ActsPage() {
   const owner = await knownBrowser();
   const [acts, saved] = await Promise.all([rememberedActs(owner), savedResults(owner)]);
-  const toursOf = (actId: string) => saved.flatMap((s) => (s.kind === "plan" && s.plan.act.id === actId ? [s.plan] : []));
+  const toursOf = (actId: string) => saved.flatMap((s) => (s.plan.act.id === actId ? [s.plan] : []));
   return (
     <div className="hl hl-flow hl-home">
       <PageHead

@@ -103,20 +103,6 @@ export interface CityHeat {
   tourScore: number;
   confidence: Confidence;
 }
-/** A city as the map shows it: where it falls on the 975 × 610 map, its Fan Heat, and its place on the tour. */
-export interface MapCity {
-  id: string;
-  name: string;
-  state: string;
-  x: number;
-  y: number;
-  heat: number;
-  hidden: boolean;
-  confidence: Confidence;
-  population: number;
-  /** Position on the tour, from 1, if it's a stop. */
-  stop?: number;
-}
 export interface RouteStop {
   cityId: string;
   /** Distance from the previous stop (or from home), by air; 0 for a first stop with no home. */
@@ -255,72 +241,6 @@ export interface Proof {
   /** The biggest cities, biggest first, by name. */
   biggestCities: string[];
 }
-/** A brand as Afinlo shows it, from Qloo: its picture, its Qloo brand genre tags. */
-export interface Brand extends PlanEntity {
-  description: string;
-  categories: string[];
-}
-/** An act whose fans love a brand, and the cities where both audiences are strong. */
-export interface MatchedAct {
-  act: Act;
-  /** Qloo's affinity of the brand's audience for the act. */
-  affinity: number;
-  /** Position among the acts Qloo returned for the brand's audience, from 1. */
-  qlooRank: number;
-  /** Afinlo's 0–100 Brand Fit: normalized affinity × a size weight (the act's reach). */
-  fit: number;
-  tier: Sponsor["tier"];
-  /** Up to three cities where both audiences are strong, best first. Empty when Qloo has no map for the act. */
-  shared: SharedCity[];
-}
-/** A city where two audiences meet: each one's Fan Heat there, and both together (their geometric mean). */
-export interface SharedCity {
-  cityId: string;
-  a: number;
-  b: number;
-  together: number;
-}
-export interface BrandMatch {
-  id: string;
-  createdAt: string;
-  request: { brandId: string; acts: "both" | "music" | "comedy" };
-  brand: Brand;
-  /** The brand's own audience on the map's hexagon tiles, like a plan's. */
-  heat?: [number, number, number][];
-  /** Where the brand's audience over-indexes: Fan Heat for the brand. */
-  cities: CityHeat[];
-  acts: MatchedAct[];
-  notes: string[];
-  traces: TasteTrace[];
-  durationMs: number;
-  example?: boolean;
-}
-/** A city for a double bill: both acts' Fan Heat, and together. */
-export interface PairCity extends CityHeat {
-  a: number;
-  b: number;
-}
-export interface Pairing {
-  id: string;
-  createdAt: string;
-  request: { aId: string; bId: string; stops: number };
-  a: Act;
-  b: Act;
-  /** Both audiences on the map: tiles strong for both are darkest. */
-  heat?: [number, number, number][];
-  /** Cities both acts have data for, by Fan Heat together (heat is the together score). */
-  cities: PairCity[];
-  route: RouteStop[];
-  /** Taste tags both crowds share (Qloo compare). */
-  shared: string[];
-  /** How alike the two maps are: of the cities either act is strong in (Fan Heat 60+), the share both are. */
-  overlap: number;
-  notes: string[];
-  traces: TasteTrace[];
-  durationMs: number;
-  example?: boolean;
-}
-
 export type TourStage =
   | { stage: "resolving"; act: string }
   | { stage: "dna" }
@@ -331,11 +251,7 @@ export type TourStage =
   | { stage: "support" }
   | { stage: "scoring" }
   | { stage: "local"; cities: string[] }
-  | { stage: "writing" }
-  | { stage: "acts"; kinds: "both" | "music" | "comedy" }
-  | { stage: "overlap"; count: number }
-  | { stage: "pair"; a: string; b: string }
-  | { stage: "route" };
+  | { stage: "writing" };
 
 /** The tour manager's specialists. */
 export const SPECIALISTS = ["route", "venues", "sponsors", "promoter"] as const;
@@ -411,16 +327,9 @@ export interface ActMemory {
   focus?: "balanced" | "hidden";
 }
 
-export const brandMatchInput = z
-  .object({ brandId: qlooId, acts: z.enum(["both", "music", "comedy"]).default("both") })
-  .strict();
-export type BrandMatchInput = z.input<typeof brandMatchInput>;
-
-export const pairInput = z
-  .object({ aId: qlooId, bId: qlooId, stops: z.number().int().min(3).max(12).default(7) })
-  .strict()
-  .refine((v) => v.aId !== v.bId, "Choose two different acts.");
-export type PairInput = z.input<typeof pairInput>;
+/** The most skipped cities and turned-down brands a plan request carries; an act's memory keeps that many, the newest. */
+export const MAX_SKIPPED_CITIES = 20;
+export const MAX_TURNED_DOWN_BRANDS = 40;
 
 export const planInput = z
   .object({
@@ -430,10 +339,11 @@ export const planInput = z
     homeCityId: cityId.optional(),
     stops: z.number().int().min(3).max(12).default(7),
     categories: z.array(sponsorCategory).max(3).default([]),
-    avoid: z.array(sponsorCategory).max(8).default([]),
-    excludeCityIds: z.array(cityId).max(20).default([]),
+    // Any of the categories: the brief lets the act rule out every one.
+    avoid: z.array(sponsorCategory).max(Object.keys(SPONSOR_CATEGORIES).length).default([]),
+    excludeCityIds: z.array(cityId).max(MAX_SKIPPED_CITIES).default([]),
     includeCityIds: z.array(cityId).max(6).optional(),
-    excludeBrandIds: z.array(qlooId).max(40).default([]),
+    excludeBrandIds: z.array(qlooId).max(MAX_TURNED_DOWN_BRANDS).default([]),
     focus: z.enum(["balanced", "hidden"]).default("balanced"),
     parentId: z.string().max(40).optional(),
   })

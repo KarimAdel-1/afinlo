@@ -138,13 +138,6 @@
   letter-spacing: -0.04em;
   color: var(--hl-ink);
 }
-.deck-cover-map .hl-hexmap {
-  background: linear-gradient(160deg, #efeefb, #e7e5f8);
-}
-.deck-cover-map .hl-legend {
-  margin-top: 4mm;
-  font-size: 11px;
-}
 
 /* Inner pages */
 .deck-cols {

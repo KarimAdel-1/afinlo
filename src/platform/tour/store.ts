@@ -1,17 +1,23 @@
-// Public storage: the Qloo response cache, finished plans (with their city guides and PDF decks), brand
-// matches and co-headliner pairings, and the public rate limits. Nobody signs in, so none of it belongs to anyone;
-// each is reachable only by its unguessable ID. Which tours each browser keeps, and where their venues and sponsors
-// stand, is in saved.ts and tracker.ts.
+// Public storage: the Qloo response cache, finished plans (with their city guides and PDF decks), and the public
+// rate limits. Nobody signs in, so none of it belongs to anyone; each plan is reachable only by its unguessable ID.
+// Which tours each browser keeps, and where their venues and sponsors stand, is in saved.ts and tracker.ts.
 import { randomBytes } from "node:crypto";
 import { db, now, transaction } from "@/lib/db";
 import { setting } from "@/lib/settings";
 import { US, whereKey } from "@/core/tour/regions";
 import { TourError, type CityGuide, type Plan } from "@/core/tour/types";
 import type { QlooCache } from "../taste/qloo";
+import { tourOf } from "./tracker";
 
 const DAY = 24 * 3600_000;
 
-/** Qloo responses kept for 24 hours, shared by every visitor: the same question never spends quota twice in a day. */
+/** When this server last cleared out expired Qloo responses. */
+let swept = 0;
+
+/**
+ * Qloo responses kept for 24 hours, shared by every visitor: the same question never spends quota twice in a day.
+ * Expired ones are deleted at most once an hour, as answers are kept, so the table doesn't grow without end.
+ */
 export const qlooCache: QlooCache = {
   async get(key) {
     const row = await db().prepare("SELECT value, expires_at FROM qloo_cache WHERE key = ?").get<{ value: string; expires_at: string }>(key);
@@ -22,6 +28,11 @@ export const qlooCache: QlooCache = {
     await db()
       .prepare("INSERT INTO qloo_cache (key, value, expires_at) VALUES (?, ?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at")
       .run(key, JSON.stringify(value), new Date(Date.now() + DAY).toISOString());
+    if (Date.now() - swept > 3600_000) {
+      swept = Date.now();
+      // A failed clear-out is tried again in an hour; it never fails the Qloo answer.
+      await db().prepare("DELETE FROM qloo_cache WHERE expires_at < ?").run(now()).catch((error) => console.error("Couldn't clear expired Qloo answers:", error));
+    }
   },
 };
 
@@ -66,6 +77,19 @@ export async function recentPlanFor(request: Plan["request"]): Promise<Plan | un
   return rows.map((r) => JSON.parse(r.plan) as Plan).find((p) => requestKey(p.request) === requestKey(request));
 }
 
+/**
+ * recentPlanFor() for a request that may be a change to a tour (its parent). The change stays on that tour: a plan
+ * made for the same request on another tour is copied onto this one, so where its venues and sponsors stand, and its
+ * conversation with the team, carry over. The copy costs no Qloo or model calls.
+ */
+export async function reusablePlan(request: Plan["request"], parent?: Plan): Promise<Plan | undefined> {
+  const found = await recentPlanFor(request);
+  if (!found || !parent || tourOf(found) === tourOf(parent)) return found;
+  const copy: Plan = { ...found, id: newPlanId(), parentId: parent.id, rootId: tourOf(parent), createdAt: now(), example: undefined };
+  await savePlan(copy);
+  return copy;
+}
+
 /** A stop's city guide, once it's been made. */
 export async function getCityGuide(planId: string, cityId: string): Promise<CityGuide | undefined> {
   const row = await db().prepare("SELECT guide FROM tour_city_guides WHERE plan_id = ? AND city_id = ?").get<{ guide: string }>(planId, cityId);
@@ -87,39 +111,6 @@ export async function saveDeck(planId: string, pdf: Buffer) {
   await db().prepare("INSERT INTO tour_decks (plan_id, pdf, created_at) VALUES (?, ?, ?) ON CONFLICT (plan_id) DO NOTHING").run(planId, pdf, now());
 }
 
-/** Brand matches and co-headliner pairings, shared by ID like plans. */
-export type MatchKind = "brand" | "pair";
-const MATCH_PREFIX: Record<MatchKind, string> = { brand: "bm_", pair: "co_" };
-export const newMatchId = (kind: MatchKind) => MATCH_PREFIX[kind] + randomBytes(16).toString("base64url");
-
-export async function saveMatch(kind: MatchKind, result: { id: string; createdAt: string; example?: boolean }, requestKey: string) {
-  await db()
-    .prepare("INSERT INTO tour_matches (id, kind, request_key, result, example, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET result = EXCLUDED.result, example = EXCLUDED.example")
-    .run(result.id, kind, requestKey, JSON.stringify(result), result.example ? 1 : 0, result.createdAt);
-}
-
-export async function getMatch<T>(kind: MatchKind, id: string): Promise<T | undefined> {
-  if (!new RegExp(`^${MATCH_PREFIX[kind]}[A-Za-z0-9_-]{20,40}$`).test(id)) return undefined;
-  const row = await db().prepare("SELECT result FROM tour_matches WHERE id = ? AND kind = ?").get<{ result: string }>(id, kind);
-  return row ? (JSON.parse(row.result) as T) : undefined;
-}
-
-/** A result made for exactly this request in the last 24 hours, if any: reused instead of asking Qloo again. */
-export async function recentMatch<T>(kind: MatchKind, requestKey: string): Promise<T | undefined> {
-  const row = await db()
-    .prepare("SELECT result FROM tour_matches WHERE kind = ? AND request_key = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1")
-    .get<{ result: string }>(kind, requestKey, new Date(Date.now() - DAY).toISOString());
-  return row ? (JSON.parse(row.result) as T) : undefined;
-}
-
-/** The newest examples of a kind, oldest first, for the one-click examples. */
-export async function exampleMatches<T>(kind: MatchKind): Promise<T[]> {
-  const rows = await db()
-    .prepare("SELECT DISTINCT ON (request_key) result, created_at FROM tour_matches WHERE kind = ? AND example = 1 ORDER BY request_key, created_at DESC")
-    .all<{ result: string; created_at: string }>(kind);
-  return rows.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((r) => JSON.parse(r.result) as T);
-}
-
 /** The newest example plan for each example act, for the one-click examples. */
 export async function examplePlans(): Promise<Pick<Plan, "id" | "act" | "cities" | "sponsors" | "route" | "proof" | "heatPoints" | "area" | "traces" | "request" | "localSpots" | "pitch">[]> {
   const rows = await db()
@@ -132,9 +123,8 @@ export async function examplePlans(): Promise<Pick<Plan, "id" | "act" | "cities"
 }
 
 /**
- * Public limits on new plans, brand matches and co-headliner pairings, counted together: each visitor gets a few an
- * hour, and the server a daily total, so an open demo can't run up the Qloo quota or the model bill. Checked and
- * recorded in one transaction.
+ * Public limits on new plans: each visitor gets a few an hour, and the server a daily total, so an open demo can't run
+ * up the Qloo quota or the model bill. Checked and recorded in one transaction.
  */
 export async function claimPlanSlot(visitor: string) {
   return transaction(async (d) => {

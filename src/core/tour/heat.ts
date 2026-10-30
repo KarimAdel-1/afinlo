@@ -2,7 +2,8 @@
 // browser) and the still one (SVG, on the server). Qloo's cells are geohash boxes on a regular grid, and a cell's
 // colour comes from its own strength, on one scale for both maps. The live map blurs the cells into a field. The blur
 // is sized to the grid, and the field is calibrated so that how hot a place looks doesn't change with the zoom, the
-// latitude or how many cells are near it. Its scale is anchored at the act's hottest places (heatLevels).
+// latitude or how many cells are near it. Its scale is anchored at the act's hottest places (heatLevels). Zoomed in
+// past where a blur can span the grid, the cells show as the boxes they are (heatApart).
 // Pure, and small enough for the browser.
 
 /** The size of Qloo's cells, in degrees. */
@@ -213,9 +214,28 @@ export function heatLevels(points: [number, number, number][], grid = heatGrid(p
 }
 
 const fix = (v: number) => Number(v.toPrecision(4));
+const RAMP = ["interpolate", ["linear"], ["heatmap-density"], ...HEAT_RAMP.flatMap(([d, [r, g, b, a]]) => [d, `rgba(${r},${g},${b},${a})`])];
+
+/**
+ * The zoom past which the blur, at its widest, no longer spans Qloo's grid. Drawn as blurs from there, the cells would
+ * stand apart as dots, each looking like a hot spot when it's an area 5 to 150 km across. So over the next zoom level
+ * the live map fades the blur out and the cells in, as the boxes they are (heatBoxes).
+ */
+export const heatApart = (grid: HeatGrid) => fix(Math.log2(MAX_RADIUS / SPREAD / spacing(grid, 0)[0]));
+
+/** How strongly the heat shows at a zoom, however it's drawn: close in, the streets and venues matter more. */
+const closeIn = (zoom: number) => 0.9 - 0.55 * Math.min(1, Math.max(0, (zoom - 9) / 4));
+const clamp = (v: number) => Math.min(1, Math.max(0, v));
+
+/** An opacity by zoom: closeIn, times `share` (0–1) of it at each zoom. */
+function fade(share: (zoom: number) => number, apart: number, most = 1) {
+  const zooms = [...new Set([...ZOOMS, apart, apart + 1].map(fix))].sort((a, b) => a - b);
+  return ["interpolate", ["linear"], ["zoom"], ...zooms.flatMap((z) => [z, Math.round(1000 * most * closeIn(z) * share(z)) / 1000])];
+}
 
 /** The live map's heat layer paint, for the points heatSpots gives (with `density` and `stretch`) and their heatLevels. */
 export function heatPaint(grid: HeatGrid, levels: number[] = ZOOMS.map(() => 1)) {
+  const apart = heatApart(grid);
   return {
     "heatmap-weight": [
       "interpolate",
@@ -225,8 +245,27 @@ export function heatPaint(grid: HeatGrid, levels: number[] = ZOOMS.map(() => 1))
     ],
     "heatmap-radius": ["interpolate", ["exponential", 2], ["zoom"], ...ZOOMS.flatMap((z) => [z, fix(heatRadius(grid, z))])],
     "heatmap-intensity": ["interpolate", ["exponential", 2], ["zoom"], ...ZOOMS.flatMap((z, i) => [z, fix(heatIntensity(grid, z) * levels[i])])],
-    "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], ...HEAT_RAMP.flatMap(([d, [r, g, b, a]]) => [d, `rgba(${r},${g},${b},${a})`])],
-    // Close in, the streets and venues matter more than the heat.
-    "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 9, 0.9, 13, 0.35],
+    "heatmap-color": RAMP,
+    "heatmap-opacity": fade((z) => clamp(apart + 1 - z), apart),
+  };
+}
+
+/** Qloo's cells as the boxes they are, for the live map zoomed in: each cell's outline, [longitude, latitude], and its density. */
+export function heatBoxes(points: [number, number, number][], grid = heatGrid(points)): { density: number; ring: [number, number][] }[] {
+  return points.map(([lat, lon, w]) => {
+    const [south, west, north, east] = cellBox(lat, lon, grid);
+    return { density: cellDensity(w), ring: [[west, south], [east, south], [east, north], [west, north], [west, south]] };
+  });
+}
+
+/**
+ * The paint for heatBoxes: each box its own colour, on the scale both maps share (as the still map colours its cells),
+ * fading in where the blur fades out. Lighter than the blur: a box covers a whole area evenly, streets included.
+ */
+export function boxPaint(grid: HeatGrid) {
+  const apart = heatApart(grid);
+  return {
+    "fill-color": ["interpolate", ["linear"], ["get", "density"], ...HEAT_RAMP.flatMap(([d, [r, g, b, a]]) => [d, `rgba(${r},${g},${b},${a})`])],
+    "fill-opacity": fade((z) => clamp(z - apart), apart, 0.45),
   };
 }

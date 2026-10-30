@@ -24,7 +24,7 @@ export interface Progress {
   signed: number;
 }
 
-/** The sponsors a tour pitches first: the plan's top six by Sponsor Fit. */
+/** The sponsors a tour pitches first: the plan's top six by Sponsor Fit, of those the act hasn't turned down. */
 export const PITCH_FIRST = 6;
 /** Days a pitch waits for an answer before it's time to follow up. */
 export const FOLLOW_UP_DAYS = 5;
@@ -33,7 +33,12 @@ const DAY = 86_400_000;
 /** Whole days since a moment: for "sent 6 days ago". */
 export const daysSince = (iso: string, now = Date.now()) => Math.floor((now - Date.parse(iso)) / DAY);
 
-export function nextUp(plan: Pick<Plan, "route" | "cities" | "sponsors">, tracks: Track[], now = Date.now()): { tasks: Task[]; progress: Progress } {
+/** `turnedDown`: brands the act has said no to since the plan was made, which it doesn't pitch. */
+export function nextUp(
+  plan: Pick<Plan, "route" | "cities" | "sponsors">,
+  tracks: Track[],
+  { now = Date.now(), turnedDown = [] }: { now?: number; turnedDown?: string[] } = {},
+): { tasks: Task[]; progress: Progress } {
   const city = (id: string) => plan.cities.find((c) => c.id === id);
   const venues = tracks.filter((t) => t.kind === "venue");
   const pitch = (brandId: string) => tracks.find((t) => t.kind === "sponsor" && t.itemId === brandId);
@@ -54,7 +59,7 @@ export function nextUp(plan: Pick<Plan, "route" | "cities" | "sponsors">, tracks
       tasks.push({ id: `venue:${stop.cityId}`, kind: "venue", title: `Find a venue in ${name}`, detail: "Afinlo has the venues these fans love there.", tab: "book", cityId: stop.cityId });
   }
 
-  const top = plan.sponsors.slice(0, PITCH_FIRST);
+  const top = plan.sponsors.filter((s) => !turnedDown.includes(s.brand.id)).slice(0, PITCH_FIRST);
   let sent = 0,
     signed = 0;
   for (const s of top) {

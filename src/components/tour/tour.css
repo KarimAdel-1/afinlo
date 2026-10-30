@@ -1,7 +1,7 @@
 /* A tour, as a workspace: the plan in tabs on the left, the real map filling the right, in Afinlo's surfaces. */
 .hl-tour {
   display: grid;
-  grid-template-columns: minmax(400px, 560px) minmax(0, 1fr);
+  grid-template-columns: minmax(420px, 640px) minmax(0, 1fr);
   min-height: calc(100dvh - 28px);
 }
 .hl-tour-side {
@@ -29,29 +29,36 @@
 }
 .hl-tour-head {
   display: grid;
-  gap: 14px;
-  padding-bottom: 18px;
+  gap: 12px;
+  padding-bottom: 14px;
 }
 .hl-tour-id {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: 6px;
+  gap: 14px;
+  margin-top: 4px;
 }
 .hl-tour-id .hl-tile {
-  width: 72px;
-  height: 72px;
-  border-radius: 22px;
-  font-size: 30px;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  font-size: 24px;
 }
 .hl-tour-id h1 {
-  font-size: clamp(30px, 2.6vw, 38px);
+  font-size: clamp(26px, 2.2vw, 32px);
   line-height: 1.05;
 }
 .hl-tour-id p {
-  margin-top: 6px;
+  margin-top: 4px;
   color: var(--hl-muted);
-  font-size: 15px;
+  font-size: 14px;
+}
+/* Whose data it is, then how far the tour has got, on one line where it fits. */
+.hl-tour-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
 }
 .hl-tour-chips {
   display: flex;
@@ -92,11 +99,10 @@
   top: 0;
   z-index: 8;
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 2px;
   margin: 0 -8px 18px;
   padding: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
   background: rgb(246 246 249 / 0.92);
   backdrop-filter: blur(12px);
 }
@@ -106,7 +112,7 @@
   align-items: center;
   gap: 7px;
   min-height: 40px;
-  padding: 8px 14px;
+  padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 100px;
   background: transparent;
@@ -152,9 +158,11 @@
   border-radius: 22px;
   background: #fff;
 }
-.hl-card-title {
+/* Under .hl, to outrank the website's own h3 size (.af2-site h3), which the dashboard sits inside too. */
+.hl .hl-card-title {
   margin-bottom: 12px !important;
-  font-size: 16px;
+  font-size: 17px;
+  line-height: 1.25;
 }
 .hl-section-head {
   margin-bottom: 12px;
@@ -168,19 +176,15 @@
   color: var(--hl-muted);
   font-size: 14px;
 }
-.hl-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-.hl-summary small,
-.hl-progress small {
+.hl-glance-facts small,
+.hl-progress small,
+.hl-small-label {
   display: block;
   color: var(--hl-muted);
   font-size: 12px;
   font-weight: 600;
 }
-.hl-summary b,
+.hl-glance-facts b,
 .hl-progress b {
   display: block;
   margin-top: 4px;
@@ -191,21 +195,126 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hl-summary span {
+
+/* Why this route: a sentence, the route's fans against the biggest cities' as two bars, and what Fan Heat means. */
+.hl-glance {
+  display: grid;
+  gap: 12px;
+}
+.hl-glance h2 {
+  font-size: 19px;
+}
+.hl-glance > p {
+  color: var(--hl-ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.hl-compare {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) 30px;
+  gap: 8px 12px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.hl-compare b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 17px;
+  text-align: right;
+}
+.hl-compare-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #f0eff7;
+}
+.hl-compare-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #8f86ff, var(--hl-blue));
+}
+.hl-compare-bar.muted i {
+  background: #c9c8d8;
+}
+.hl-glance-note {
+  color: var(--hl-muted);
+  font-size: 12px;
+}
+.hl-glance-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hl-line);
+}
+.hl-glance-facts span {
   display: block;
   margin-top: 2px;
   color: var(--hl-muted);
   font-size: 12px;
   line-height: 1.4;
 }
-.hl-summary-proof {
-  grid-column: 1 / -1;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--hl-line);
+.hl-glance-key {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hl-soft);
+  color: var(--hl-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
 }
-.hl-summary .hl-summary-proof b {
-  font-size: 26px;
-  white-space: normal;
+.hl-glance-key b {
+  color: var(--hl-ink);
+}
+
+/* Change the plan: its buttons in two groups {
+  margin-top: 12px;
+}
+
+/* Promote: links to its parts, the fans in a sentence, ages in words, short place lists. */
+.hl-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 4px;
+}
+.hl-jump a {
+  padding: 6px 12px;
+  border: 1px solid var(--hl-line);
+  border-radius: 100px;
+  background: #fff;
+  color: var(--hl-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.hl-jump a:hover {
+  border-color: var(--hl-blue);
+  color: var(--hl-blue);
+}
+.hl-fan-line {
+  margin-bottom: 14px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.hl-small-label {
+  margin: 14px 0 8px;
+}
+.hl-card-title + .hl-small-label,
+.hl-fan-line + .hl-small-label {
+  margin-top: 0;
+}
+.hl-skew.words {
+  grid-template-columns: 64px minmax(0, 1fr) 128px;
+}
+.hl-skew.words b {
+  text-align: left;
+}
+.hl-places-hint {
+  margin: -6px 0 10px;
+  font-size: 12px;
+}
+.hl-placelist.compact {
+  gap: 8px;
 }
 
 /* Fan Heat, as a bar and a number */
@@ -314,10 +423,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A stop's Fan Heat over what to do with it, at the card's right. */
+.hl-stop-side {
+  display: grid;
+  flex-shrink: 0;
+  justify-items: end;
+  gap: 4px;
+}
 .hl-stop-actions {
   display: flex;
-  gap: 6px;
-  margin: 6px 0 0 50px;
+  gap: 2px;
+  margin-right: -6px;
+}
+.hl-stop-actions button {
+  padding: 3px 6px;
 }
 .hl-stop-actions button,
 .hl-venue-links button,
@@ -346,55 +465,17 @@
 .hl-linkish {
   color: var(--hl-blue);
 }
-
-.hl-also {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.hl-also li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--hl-line);
-  border-radius: 14px;
-  background: #fff;
-}
-.hl-also li > span:first-child {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-}
-.hl-also b {
-  overflow: hidden;
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hl-also small {
-  overflow: hidden;
-  color: var(--hl-muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hl-also .hl-heat-bar {
-  width: 36px;
-}
-.hl-also-star {
-  flex-shrink: 0;
-  color: #9aac10;
+.hl-show-more {
+  margin-top: 8px;
 }
 
 /* Choosing a stop */
+/* Every stop in view, on as many lines as it takes: nothing hidden off to the side. */
 .hl-stoppick {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
 }
 .hl-stoppick button {
   display: inline-flex;
@@ -942,9 +1023,8 @@
 
 @media (max-width: 1180px) {
   .hl-tour {
-    grid-template-columns: minmax(360px, 460px) minmax(0, 1fr);
+    grid-template-columns: minmax(380px, 500px) minmax(0, 1fr);
   }
-  .hl-also,
   .hl-channels,
   .hl-local {
     grid-template-columns: minmax(0, 1fr);
@@ -965,7 +1045,6 @@
   .hl-tour-side {
     padding: 16px 14px 40px;
   }
-  .hl-summary,
   .hl-progress {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -974,14 +1053,26 @@
   .hl-tabs {
     top: 64px;
   }
+  /* The tour team as a sheet along the bottom, opening to most of the screen. */
+  .hl-teamchat {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    transform: none;
+    border-radius: 22px;
+  }
+  .hl-teamchat.open {
+    height: 82dvh;
+  }
 }
 @media (max-width: 520px) {
-  .hl-summary,
-  .hl-progress {
+  .hl-progress,
+  .hl-glance-facts {
     grid-template-columns: minmax(0, 1fr);
   }
-  .hl-stop-actions {
-    margin-left: 0;
+  .hl-skew.words {
+    grid-template-columns: 56px minmax(0, 1fr) 110px;
   }
   .hl-map-key {
     display: none;
@@ -1090,14 +1181,125 @@
   border-top: 1px solid var(--hl-line);
 }
 
-/* The tour team: the conversation, what the team is doing, what it made, and the message box */
-.hl-team {
-  display: grid;
-  gap: 16px;
+/*
+ * The tour team, at the foot of the tour on every tab: a message bar, centred and floating, that opens upward into the
+ * conversation. On a phone or a tablet it's a sheet along the bottom.
+ */
+.hl-teamchat {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  transform: translateX(-50%);
+  border: 1px solid var(--hl-line);
+  border-radius: 26px;
+  background: rgb(255 255 255 / 0.97);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -24px rgba(36, 32, 67, 0.45);
 }
+.hl-teamchat.open {
+  height: min(72dvh, 680px);
+}
+.hl-teamchat-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.hl-teamchat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--hl-line);
+}
+.hl-teamchat-head > span:last-child {
+  display: grid;
+}
+.hl-teamchat-head b {
+  font-size: 15px;
+}
+.hl-teamchat-head small {
+  color: var(--hl-muted);
+  font-size: 12px;
+}
+.hl-teamchat-icon {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--hl-lavender);
+  color: var(--hl-blue);
+}
+/* Closed, while the team works or once it has replied: one line over the bar, to open it. */
+.hl-teamchat-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 18px 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--hl-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.hl-teamchat-status:hover {
+  color: var(--hl-ink);
+}
+.hl-teamchat-toggle {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hl-soft);
+  color: var(--hl-ink);
+}
+.hl-teamchat-toggle:hover {
+  background: var(--hl-lavender);
+  color: var(--hl-blue);
+}
+.hl-teamchat-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hl-blue);
+}
+.hl-teamchat-toggle .hl-teamchat-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+/* The tour's own content scrolls clear of the bar. */
+.hl-tour-side {
+  padding-bottom: 120px;
+}
+
+/* The conversation, what the team is doing, what it made, and the message box */
 .hl-team-log {
   display: grid;
+  flex: 1;
+  align-content: start;
   gap: 14px;
+  min-height: 0;
+  padding: 16px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .hl-team-msg {
   max-width: 92%;
@@ -1177,24 +1379,24 @@
   gap: 8px;
 }
 .hl-team-ask {
-  position: sticky;
-  bottom: 12px;
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 8px 8px 8px 18px;
+  margin: 8px;
+  padding: 6px;
   border: 1.5px solid var(--hl-line);
-  border-radius: 24px;
+  border-radius: 21px;
   background: #fff;
-  box-shadow: 0 12px 30px -18px rgba(36, 32, 67, 0.35);
 }
 .hl-team-ask:focus-within {
   border-color: var(--hl-blue);
 }
 .hl-team-ask textarea {
   flex: 1;
+  align-self: center;
   min-width: 0;
-  padding: 8px 0;
+  max-height: 120px;
+  padding: 8px 4px;
   border: 0;
   background: transparent;
   color: var(--hl-ink);
@@ -1211,39 +1413,4 @@
   height: 42px;
   padding: 0;
   border-radius: 50%;
-}
-.hl-team-launch {
-  position: sticky;
-  bottom: 12px;
-  z-index: 7;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  margin-top: 20px;
-  padding: 12px 18px;
-  border: 1.5px solid var(--hl-line);
-  border-radius: 24px;
-  background: #fff;
-  color: var(--hl-ink);
-  text-align: left;
-  box-shadow: 0 12px 30px -18px rgba(36, 32, 67, 0.35);
-  transition: border-color 0.15s;
-}
-.hl-team-launch:hover {
-  border-color: var(--hl-blue);
-}
-.hl-team-launch > svg {
-  flex-shrink: 0;
-  color: var(--hl-blue);
-}
-.hl-team-launch span {
-  display: grid;
-}
-.hl-team-launch b {
-  font-size: 15px;
-}
-.hl-team-launch small {
-  color: var(--hl-muted);
-  font-size: 12px;
 }

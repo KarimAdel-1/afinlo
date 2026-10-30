@@ -39,8 +39,8 @@ function checkpointer(): Promise<BaseCheckpointSaver> {
 /** One conversation per browser and tour (not per version: a change to the tour keeps talking in the same thread). */
 const threadOf = (plan: Pick<Plan, "id" | "rootId">, browser: string) => `tour:${tourOf(plan)}:${browser}`;
 
-/** The specialists asked in these messages. */
-const agentsIn = (messages: BaseMessage[]) => [...new Set(messages.flatMap((m) => (isToolMessage(m) && agentOf(m.name ?? "") ? [agentOf(m.name ?? "")!] : [])))];
+/** The specialists asked in these messages (a handoff past the limit, marked as an error, wasn't). */
+const agentsIn = (messages: BaseMessage[]) => [...new Set(messages.flatMap((m) => (isToolMessage(m) && m.status !== "error" && agentOf(m.name ?? "") ? [agentOf(m.name ?? "")!] : [])))];
 
 /** One message to the tour's manager: the reply, the specialists it asked, and what they made for the user. */
 export async function askManager(

@@ -1,6 +1,6 @@
-// Postgres: the Qloo cache, finished plans and what's made from them (city guides, decks, brand matches, pairings),
-// the public limits, and what each browser keeps (its tours, where their venues and sponsors stand, what's
-// remembered about each act). The tables are made on first use when they're missing. Queries use ? placeholders.
+// Postgres: the Qloo cache, finished plans and what's made from them (city guides, decks), the public limits, and
+// what each browser keeps (its tours, where their venues and sponsors stand, what's remembered about each act). The
+// tables are made on first use when they're missing. Queries use ? placeholders.
 import pg from "pg";
 import { setting } from "./settings";
 
@@ -24,13 +24,9 @@ const TABLES = [
      guide TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (plan_id, city_id)
    )`,
   `CREATE TABLE IF NOT EXISTS tour_decks (plan_id TEXT PRIMARY KEY REFERENCES tour_plans(id) ON DELETE CASCADE, pdf BYTEA NOT NULL, created_at TEXT NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS tour_matches (
-     id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('brand','pair')), request_key TEXT NOT NULL,
-     result TEXT NOT NULL, example INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
-   )`,
-  `CREATE INDEX IF NOT EXISTS tour_matches_recent ON tour_matches(kind, request_key, created_at DESC)`,
+  // `kind` is always 'plan' now; databases made before still have rows of other kinds, which are left out.
   `CREATE TABLE IF NOT EXISTS tour_saved (
-     visitor TEXT NOT NULL, item_id TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('plan','brand','pair')),
+     visitor TEXT NOT NULL, item_id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'plan',
      saved_at TEXT NOT NULL, PRIMARY KEY (visitor, item_id)
    )`,
   `CREATE TABLE IF NOT EXISTS tour_statuses (

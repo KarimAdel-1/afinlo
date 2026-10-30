@@ -306,9 +306,6 @@
 .hl-app-main .hl-result {
   padding-top: 28px;
 }
-.hl-app-main .hl-stepbar {
-  justify-content: flex-start;
-}
 @media (max-width: 720px) {
   .hl-app-main .hl-flow,
   .hl-app-main .hl-result {

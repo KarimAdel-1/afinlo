@@ -49,10 +49,11 @@ export function GuideWait({ guide, city, retry }: { guide?: GuideState; city: st
   return null;
 }
 
-export function PlaceLine({ place }: { place: CityPlace }) {
+/** What a place is, where, and its rating. `short` leaves out the address (it's in the row's tooltip). */
+export function PlaceLine({ place, short = false }: { place: CityPlace; short?: boolean }) {
   return (
     <small>
-      {[place.kind, place.address].filter(Boolean).join(" · ")}
+      {[place.kind, short ? undefined : place.address].filter(Boolean).join(" · ")}
       {place.rating ? (
         <span className="hl-rating">
           <Star size={12} aria-hidden /> {place.rating.toFixed(1)}

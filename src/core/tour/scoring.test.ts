@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COUNTRY_NAMES, REGIONS, US } from "./regions";
-import { cityAffinity, CITY_RADIUS_KM, DRIVE_KM, km, legMode, mapOverlap, MIN_GAP_KM, obviousCount, pairCities, planRoute, proofOf, routeKm, routeRules, scoreActs, scoreCities, scoreSponsors, sharedCities, strongestIn, WORLD_GAP_KM, type HeatCell } from "./scoring";
+import { cityAffinity, CITY_RADIUS_KM, DRIVE_KM, km, legMode, MIN_GAP_KM, obviousCount, planRoute, proofOf, routeKm, routeRules, scoreCities, scoreSponsors, strongestIn, WORLD_GAP_KM, type HeatCell } from "./scoring";
 import type { CityHeat } from "./types";
 import { citiesIn, WORLD_CITIES } from "./world";
 import { whyCity } from "./why";
@@ -168,36 +168,6 @@ test("a brand's strongest route cities come from its own heatmap", () => {
   const cities = us([...around("Austin", 0.9), ...around("Denver", 0.95), ...around("Seattle", 0.92)]);
   const brandCells = [...around("Seattle", 0.99), ...around("Austin", 0.8), ...around("Miami", 1)];
   assert.deepEqual(strongestIn(brandCells, cities).map((id) => cities.find((c) => c.id === id)!.name), ["Seattle", "Austin"]);
-});
-
-test("two audiences meet where both are strong: shared cities, a double bill's heat and hidden markets, and map overlap", () => {
-  const a = us([...around("Nashville", 0.99), ...around("Asheville", 0.95), ...around("New York", 0.9), ...around("Omaha", 0.5)]);
-  const b = us([...around("Asheville", 0.99), ...around("New York", 0.95), ...around("Nashville", 0.6), ...around("Omaha", 0.55)]);
-  const shared = sharedCities(a, b);
-  const name = (id: string) => WORLD_CITIES.find((c) => c.id === id)!.name;
-  assert.deepEqual(shared.map((s) => name(s.cityId)), ["Asheville", "New York", "Nashville", "Omaha"], "a city strong for one act only ranks below one strong for both");
-  assert.deepEqual(shared[0], { cityId: city("Asheville").id, a: 92, b: 100, together: 96 });
-  const pair = pairCities(a, b);
-  assert.deepEqual(pair.map((c) => [c.name, c.heat]), [["Asheville", 96], ["New York", 86], ["Nashville", 33], ["Omaha", 0]]);
-  assert.equal(pair.find((c) => c.name === "Asheville")!.hidden, true);
-  assert.equal(pair.find((c) => c.name === "Nashville")!.hidden, false, "strong for one act isn't a hidden market for the pair");
-  assert.equal(pair.find((c) => c.name === "New York")!.hidden, false, "an obvious metro is never hidden");
-  assert.equal(planRoute(pair, { stops: 2 }).length, 2, "a double bill routes like one act");
-  assert.equal(Number(mapOverlap(a, b).toFixed(3)), 0.667, "two of the three cities either is strong in");
-  assert.equal(mapOverlap(a, []), 0);
-});
-
-test("Brand Fit merges duplicate acts, scales Qloo's affinity, weighs reach, and stays within 0–100", () => {
-  const act = (id: string, popularity: number) => ({ id, name: `Act ${id}`, kind: "artist" as const, description: "", disambiguation: "", popularity, comedian: false });
-  const scored = scoreActs([
-    { act: act("1", 0.999), affinity: 0.95 },
-    { act: act("2", 0.95), affinity: 0.9 },
-    { act: act("1", 0.999), affinity: 0.7 },
-    { act: act("3", 0.5), affinity: 0.8 },
-  ]);
-  assert.deepEqual(scored.map((s) => [s.act.id, s.fit, s.tier, s.qlooRank]), [["1", 80, "household", 1], ["2", 80, "established", 2], ["3", 36, "niche", 3]]);
-  assert.ok(scored.every((s) => s.fit >= 0 && s.fit <= 100));
-  assert.deepEqual(scoreActs([]), []);
 });
 
 test("the proof: the route's Fan Heat against the area's biggest cities, as many as it has stops", () => {

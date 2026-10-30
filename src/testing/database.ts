@@ -16,7 +16,6 @@ export function testDatabase() {
     for (const table of ["tour_saved", "tour_statuses", "tour_acts", "tour_chat_usage"]) await db().prepare(`DELETE FROM ${table} WHERE visitor LIKE 'test-%'`).run();
     await db().prepare("DELETE FROM tour_city_guides WHERE plan_id LIKE 'pl_test_%'").run();
     await db().prepare("DELETE FROM tour_plans WHERE act_id = ?").run(FIXTURE_ACT_ID);
-    await db().prepare("DELETE FROM tour_matches WHERE request_key LIKE 'test-%'").run();
     await closeDb();
   });
 }

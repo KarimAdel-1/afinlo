@@ -2,7 +2,7 @@
 // It's kept per browser, by its visitor cookie, like the tours on Home. Plans themselves never change; a tour's state
 // is kept under its first plan's ID, so it carries through every change to the plan.
 import { db, now } from "@/lib/db";
-import type { Act, ActMemory, Plan, Track } from "@/core/tour/types";
+import { MAX_SKIPPED_CITIES, MAX_TURNED_DOWN_BRANDS, type Act, type ActMemory, type Plan, type Track } from "@/core/tour/types";
 
 /** The tour a plan belongs to. */
 export const tourOf = (plan: Pick<Plan, "id" | "rootId">) => plan.rootId ?? plan.id;
@@ -51,9 +51,17 @@ export async function actMemory(browser: string | undefined, actId: string): Pro
   return row ? (JSON.parse(row.prefs) as ActMemory) : undefined;
 }
 
+/** The act as this browser last toured it, if it has. */
+export async function rememberedAct(browser: string | undefined, actId: string): Promise<Act | undefined> {
+  if (!browser) return undefined;
+  const row = await db().prepare("SELECT act FROM tour_acts WHERE visitor = ? AND act_id = ?").get<{ act: string }>(browser, actId);
+  return row ? (JSON.parse(row.act) as Act) : undefined;
+}
+
 /**
  * Remembers an act and what's been decided for it: the latest tour's choices, and every no (a sponsor category, a
- * brand, a city), kept until it's taken back.
+ * brand, a city), kept until it's taken back. Only as many cities and brands as a plan can carry are kept, the newest:
+ * the oldest give way rather than stop the act's next tour being made.
  */
 export async function rememberAct(browser: string, act: Act, change: ActMemory, options: { replace?: boolean } = {}) {
   const before = (await actMemory(browser, act.id)) ?? {};
@@ -67,6 +75,8 @@ export async function rememberAct(browser: string, act: Act, change: ActMemory, 
         excludeBrandIds: union(before.excludeBrandIds, change.excludeBrandIds),
         excludeCityIds: union(before.excludeCityIds, change.excludeCityIds),
       };
+  memory.excludeCityIds = memory.excludeCityIds?.slice(-MAX_SKIPPED_CITIES);
+  memory.excludeBrandIds = memory.excludeBrandIds?.slice(-MAX_TURNED_DOWN_BRANDS);
   await db()
     .prepare(
       "INSERT INTO tour_acts (visitor, act_id, act, prefs, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (visitor, act_id) DO UPDATE SET act = EXCLUDED.act, prefs = EXCLUDED.prefs, updated_at = EXCLUDED.updated_at",

@@ -196,12 +196,35 @@ test("the limits hold: the team's lookups run out, a specialist's last step and 
   assert.match(system(manager, -1), /reply to the user now/);
 });
 
+test("one round can't hand out more than the message's tasks: the rest are answered without a specialist", async () => {
+  const plan = await tour();
+  const handoffs = ["ask_route_planner", "ask_venue_booker", "ask_sponsor_scout", "ask_promoter", "ask_route_planner", "ask_venue_booker"];
+  const manager = new ScriptedModel([
+    calls(...handoffs.map((name, i) => [name, { task: `Task ${i + 1}.` }] as [string, Record<string, unknown>])),
+    (messages) => {
+      const answers = results(messages);
+      assert.equal(answers.length, handoffs.length, "every call has its answer");
+      assert.equal(answers.filter((a) => /^Not asked/.test(a)).length, handoffs.length - LIMITS.asks);
+      return "Here's what the team found.";
+    },
+  ]);
+  const team = Object.fromEntries((["route", "venues", "sponsors", "promoter"] as const).map((r) => [r, new ScriptedModel([`The ${r} answer.`], r)]));
+  const out = await ask(plan, "Everything, twice.", { manager, ...team });
+  assert.equal(Object.values(team).reduce((n, m) => n + m.calls.length, 0), LIMITS.asks, "only as many specialists as the limit");
+  assert.deepEqual([...out.agents].sort(), ["promoter", "route", "sponsors", "venues"]);
+  assert.equal(manager.calls.at(-1)!.toolChoice, "none", "and the manager replies");
+});
+
 test("the conversation is remembered across messages, and older turns fold into a summary once it's long", async () => {
   const plan = await tour();
   const browser = testBrowser();
   const saver = new MemorySaver();
-  for (let i = 1; i <= LIMITS.foldAt; i++)
-    await ask(plan, `Message ${i}`, { manager: new ScriptedModel([(m) => (i > 1 && assert.ok(m.some((x) => x.content === `Reply ${i - 1}`), "the last reply is remembered"), `Reply ${i}`)]) }, { browser, saver });
+  // The first message makes a card; once its turn folds into the summary, the card goes too.
+  await ask(plan, "Message 1", { manager: new ScriptedModel([calls(["remember_no", { kind: "city", name: stopOf(plan, 0).name }]), "Reply 1"]) }, { browser, saver });
+  for (let i = 2; i <= LIMITS.foldAt; i++)
+    await ask(plan, `Message ${i}`, { manager: new ScriptedModel([(m) => (assert.ok(m.some((x) => x.content === `Reply ${i - 1}`), "the last reply is remembered"), `Reply ${i}`)]) }, { browser, saver });
+  const cardsNow = async () => ((await saver.getTuple({ configurable: { thread_id: `tour:${plan.id}:${browser}` } }))?.checkpoint.channel_values as { cards: unknown[] }).cards;
+  assert.equal((await cardsNow()).length, 1);
   const summary = new ScriptedModel([(m) => (assert.match(String(m.at(-1)!.content), /User: Message 1\n/), "The user asked ten things.")]);
   const manager = new ScriptedModel([
     (m) => {
@@ -218,6 +241,7 @@ test("the conversation is remembered across messages, and older turns fold into 
     Array.from({ length: LIMITS.keep }, (_, i) => `Message ${11 - LIMITS.keep + 1 + i}`),
   );
   assert.equal(history.messages.at(-1)!.text, "Reply 11");
+  assert.deepEqual(await cardsNow(), [], "the folded turn's card is gone with it");
 });
 
 test("a turn cut short leaves no broken messages: its unanswered handoffs are dropped before the next turn", async () => {

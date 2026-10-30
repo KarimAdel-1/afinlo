@@ -3,7 +3,7 @@
 // through the shared client (timeouts, bounded retries, traces) and the 24-hour cache.
 import { z } from "zod";
 import type { TasteTrace } from "@/core/taste/types";
-import type { Act, Brand, CityPlace, PlanEntity } from "@/core/tour/types";
+import type { Act, CityPlace, PlanEntity } from "@/core/tour/types";
 import type { BrandResult, HeatCell } from "@/core/tour/scoring";
 import { QlooClient, safeImage, website } from "../taste/qloo";
 import { qlooCache } from "./store";
@@ -90,44 +90,6 @@ export async function searchActs(client: QlooClient, query: string, traces: Tast
 export async function actById(client: QlooClient, id: string, traces: TasteTrace[], signal?: AbortSignal): Promise<Act | undefined> {
   const body = await client.request("qloo_entities", "/entities", { entity_ids: id }, traces, signal);
   return toAct(entities(body)[0]);
-}
-
-function toBrand(v: unknown): Brand | undefined {
-  const e = planEntity(v);
-  if (!e) return undefined;
-  const r = record(v),
-    p = record(r.properties);
-  return { ...e, description: str(p.short_description || p.description, 400), categories: tagIds(r.tags).filter((t) => t.startsWith("urn:tag:genre:brand:")) };
-}
-
-/** Brands matching a name, for the visitor to confirm. Exact name matches first. */
-export async function searchBrands(client: QlooClient, query: string, traces: TasteTrace[], signal?: AbortSignal): Promise<Brand[]> {
-  const body = await client.request("qloo_search", "/search", { query, types: "urn:entity:brand", take: "8" }, traces, signal);
-  const found = entities(body).flatMap((v) => toBrand(v) ?? []);
-  const exact = (b: Brand) => (b.name.toLowerCase() === query.trim().toLowerCase() ? 0 : 1);
-  return found.sort((a, b) => exact(a) - exact(b));
-}
-
-export async function brandById(client: QlooClient, id: string, traces: TasteTrace[], signal?: AbortSignal): Promise<Brand | undefined> {
-  const body = await client.request("qloo_entities", "/entities", { entity_ids: id }, traces, signal);
-  const brand = toBrand(entities(body)[0]);
-  return brand?.type.startsWith("brand") ? brand : undefined;
-}
-
-/** Comedians, as Qloo tags people. */
-export const COMEDIAN_TAG = "urn:tag:genre:person:comedian";
-
-/** The acts a brand's audience over-indexes for: musicians (artists) or comedians (people Qloo tags as comedians). */
-export async function actsForBrand(client: QlooClient, brandId: string, kind: "music" | "comedy", traces: TasteTrace[], signal?: AbortSignal): Promise<{ act: Act; affinity: number }[]> {
-  const params: Record<string, string> =
-    kind === "music"
-      ? { "filter.type": "urn:entity:artist", "signal.interests.entities": brandId, take: "10" }
-      : { "filter.type": "urn:entity:person", "filter.tags": COMEDIAN_TAG, "signal.interests.entities": brandId, take: "10" };
-  return (await insightEntities(client, params, traces, signal)).flatMap((v) => {
-    const act = toAct(v, kind === "music" ? "artist" : "person");
-    const affinity = num(record(record(v).query).affinity);
-    return act && affinity !== undefined ? [{ act: kind === "comedy" ? { ...act, comedian: true } : act, affinity }] : [];
-  });
 }
 
 /**
@@ -253,20 +215,6 @@ export async function similarActs(client: QlooClient, ids: string[], traces: Tas
 export async function namedActs(client: QlooClient, ids: string[], traces: TasteTrace[], signal?: AbortSignal): Promise<Act[] | undefined> {
   const found = await Promise.all(ids.map((id) => actById(client, id, traces, signal)));
   return found.every((a): a is Act => !!a) ? found : undefined;
-}
-
-/**
- * Co-headliners to suggest: the acts whose audiences overlap most with this one's, of the same kind (comedians for a
- * comedian, as Qloo tags people; artists otherwise), strongest overlap first.
- */
-export async function pairSuggestions(client: QlooClient, act: Act, traces: TasteTrace[], signal?: AbortSignal): Promise<Act[]> {
-  const params: Record<string, string> = act.comedian
-    ? { "filter.type": "urn:entity:person", "filter.tags": COMEDIAN_TAG, "signal.interests.entities": act.id, "filter.exclude.entities": act.id, take: "8" }
-    : { "filter.type": "urn:entity:artist", "signal.interests.entities": act.id, "filter.exclude.entities": act.id, take: "8" };
-  return (await insightEntities(client, params, traces, signal)).flatMap((v) => {
-    const found = toAct(v, act.comedian ? "person" : "artist");
-    return found && found.id !== act.id ? [act.comedian ? { ...found, comedian: true } : found] : [];
-  });
 }
 
 /** Taste tags two audiences share (Qloo compare), without the region tags every US act shares: at most `max`. */
