@@ -15,8 +15,8 @@ import type { Desk } from "./desk";
 import { managerPrompt, specialistPrompt, SUMMARY_PROMPT, TEAM } from "./team";
 import { managerTools, teamTools } from "./tools";
 
-/** Whose model it is: the manager's, a specialist's, or the summarizer's. */
-export type Role = "manager" | Specialist | "summary";
+/** Whose model it is: the manager's, a specialist's, the summarizer's, or the assistant's on Home. */
+export type Role = "manager" | Specialist | "summary" | "assistant";
 export type Models = (role: Role) => BaseChatModel;
 
 export const LIMITS = {

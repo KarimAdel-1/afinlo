@@ -268,15 +268,29 @@ export interface AgentDraft {
   subject?: string;
   body: string;
 }
+/** The tour workspace's tabs, which the tour team can open. */
+export const TOUR_TABS = ["plan", "book", "fund", "promote", "next"] as const;
+export type TourTab = (typeof TOUR_TABS)[number];
+export const TOUR_TAB_LABELS: Record<TourTab, string> = { plan: "Plan", book: "Book", fund: "Fund", promote: "Promote", next: "Next up" };
+
+/** Where the user is in the tour as they send a message: the tab, and the stop in hand. */
+export interface TourContext {
+  tab: TourTab;
+  /** A stop's city ID. */
+  stop?: string;
+}
+
 /**
- * What the tour manager's team did in a turn besides the reply: a change to the tour for the user to apply, a draft,
- * a status set, a "no" remembered for the act's next tours.
+ * What the tour manager's team did in a turn besides the reply: a change to the tour (applied at once, with the request
+ * it came from to go back to), a draft, a status set, a "no" remembered for the act's next tours, a part of the tour to
+ * show.
  */
 export type ManagerCard =
-  | { id: string; kind: "change"; summary: string; request: PlanRequest & { parentId: string } }
+  | { id: string; kind: "change"; summary: string; request: PlanRequest & { parentId: string }; undo?: PlanRequest }
   | { id: string; kind: "draft"; draft: AgentDraft }
   | { id: string; kind: "status"; text: string; track: Omit<Track, "updatedAt"> }
-  | { id: string; kind: "memory"; text: string };
+  | { id: string; kind: "memory"; text: string }
+  | { id: string; kind: "show"; text: string; tab: TourTab; cityId?: string };
 /** A message in a tour's conversation with its manager, as the page shows it. */
 export interface ManagerMessage {
   role: "user" | "assistant";
@@ -290,6 +304,53 @@ export type ManagerEvent =
   | { kind: "ask"; agent: Specialist; task: string }
   | { kind: "tool"; agent: Specialist | "manager"; label: string }
   | { kind: "answered"; agent: Specialist };
+
+/**
+ * What Afinlo's assistant knows about the person it's talking to, gathered in conversation and kept for this browser:
+ * every field is what they said, in their words.
+ */
+export interface ArtistProfile {
+  /** Their name, or the name they perform under. */
+  name?: string;
+  role?: "artist" | "comedian" | "manager" | "agent" | "other";
+  /** The act they're planning for, and its ID: Qloo's, or newActId() for an act Qloo doesn't know. */
+  act?: string;
+  actId?: string;
+  /** Acts they say they sound like. */
+  soundsLike?: string[];
+  basedIn?: string;
+  /** Where they are in their career, as they put it ("a few hundred monthly listeners"). */
+  stage?: string;
+  goals?: string[];
+  /** Limits to plan around ("no flights", "weekends only", "a small budget"). */
+  limits?: string[];
+  notes?: string;
+}
+export const artistProfile = z
+  .object({
+    name: z.string().max(80),
+    role: z.enum(["artist", "comedian", "manager", "agent", "other"]),
+    act: z.string().max(80),
+    actId: qlooId,
+    soundsLike: z.array(z.string().max(80)).max(5),
+    basedIn: z.string().max(80),
+    stage: z.string().max(200),
+    goals: z.array(z.string().max(160)).max(6),
+    limits: z.array(z.string().max(160)).max(6),
+    notes: z.string().max(400),
+  })
+  .partial();
+
+/** What the assistant made in a turn besides its reply: a tour it planned, to open. */
+export type AssistantCard = { id: string; kind: "tour"; planId: string; title: string; route: string[] };
+/** A message in the assistant's conversation, as the page shows it. */
+export interface AssistantMessage {
+  role: "user" | "assistant";
+  text: string;
+  cards?: AssistantCard[];
+}
+/** What the assistant is doing, as it happens. */
+export type AssistantEvent = { kind: "tool"; label: string };
 
 /** Where a sponsor pitch stands on a tour. */
 export const PITCH_STATUSES = ["to_send", "sent", "replied", "signed", "passed"] as const;

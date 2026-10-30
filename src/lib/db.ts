@@ -36,6 +36,7 @@ const TABLES = [
   `CREATE TABLE IF NOT EXISTS tour_acts (
      visitor TEXT NOT NULL, act_id TEXT NOT NULL, act TEXT NOT NULL, prefs TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (visitor, act_id)
    )`,
+  `CREATE TABLE IF NOT EXISTS tour_profiles (visitor TEXT PRIMARY KEY, profile TEXT NOT NULL, updated_at TEXT NOT NULL)`,
 ];
 const NAMES = TABLES.flatMap((sql) => sql.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)?.[1] ?? []);
 

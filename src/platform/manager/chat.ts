@@ -22,8 +22,11 @@ export interface ManagerDeps {
 }
 
 let saver: Promise<BaseCheckpointSaver> | undefined;
-/** The conversations' checkpointer. Its tables are made the first time; once they're there, that step is skipped. */
-function checkpointer(): Promise<BaseCheckpointSaver> {
+/**
+ * The conversations' checkpointer (the tour teams' and the assistant's). Its tables are made the first time; once
+ * they're there, that step is skipped.
+ */
+export function checkpointer(): Promise<BaseCheckpointSaver> {
   saver ??= (async () => {
     const s = PostgresSaver.fromConnString(setting("DATABASE_URL")!);
     const there = await db().prepare("SELECT to_regclass('checkpoint_migrations') AS t").get<{ t: string | null }>();

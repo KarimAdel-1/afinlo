@@ -19,6 +19,8 @@ export interface ModelChoice {
 export const MODELS = {
   /** The pitch pack for a new tour: the deck's text and the sponsor emails. */
   writer: { model: "gpt-6-luna", effort: "medium" },
+  /** The assistant on Home: gets to know the user, finds the act, shows where its fans are, plans tours. */
+  assistant: { model: "gpt-6-luna", effort: "low" },
   /** The tour manager: which specialists to ask, and the reply from what they found. */
   manager: { model: "gpt-6-luna", effort: "none" },
   /** The route planner: explains the route from its numbers and turns a request into a change. */

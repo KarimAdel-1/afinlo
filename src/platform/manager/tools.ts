@@ -158,8 +158,10 @@ function saveDraft(desk: Desk, agent: Specialist, type: AgentDraft["type"]) {
 
 // The route planner.
 
-const areaNamed = (text: string): Where | undefined => {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z]+/g, " ").trim();
+/** An area to tour, by name: "the world", a region by name or ID, or one or more countries by name or ISO code. */
+export const areaNamed = (text: string): Where | undefined => {
+  // "The United States" and "United States", "the UK and Ireland" and "UK and Ireland", are the same place.
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z]+/g, " ").trim().replace(/^the /, "");
   if (/^(the )?(whole )?world( tour)?$|^everywhere$|^worldwide$/.test(norm(text))) return { kind: "world" };
   const region = REGIONS.find((r) => norm(r.label) === norm(text) || r.id === text.trim().toLowerCase());
   if (region) return { kind: "region", region: region.id };

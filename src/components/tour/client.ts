@@ -1,5 +1,5 @@
 // Browser helpers for the app's own API.
-import type { ManagerCard, ManagerEvent, PlanInput, Specialist, TourStage } from "@/core/tour/types";
+import type { AssistantCard, AssistantEvent, ManagerCard, ManagerEvent, PlanInput, Specialist, TourStage } from "@/core/tour/types";
 
 export async function postJson<T>(url: string, body: object): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -32,6 +32,28 @@ export async function streamPlan(input: PlanInput & { parentId?: string }, onSta
       if (event.planId) return event.planId;
     }
     if (done) throw new Error("The connection closed before it finished. Please try again.");
+  }
+}
+
+/** A message to the assistant on Home, reporting what it does as it happens. Resolves with the reply and the tours it made. */
+export async function streamAssistant(message: string, onEvent: (e: AssistantEvent) => void): Promise<{ reply: string; cards: AssistantCard[] }> {
+  const res = await fetch("/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+  if (res.headers.get("content-type")?.includes("application/json")) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || "The assistant couldn't answer. Please try again.");
+  if (!res.ok || !res.body) throw new Error("The assistant couldn't start. Please try again.");
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += value ?? "";
+    const lines = buffer.split("\n");
+    buffer = done ? "" : lines.pop()!;
+    for (const line of lines.filter(Boolean)) {
+      const event = JSON.parse(line) as { event?: AssistantEvent; reply?: { reply: string; cards: AssistantCard[] }; error?: string };
+      if (event.event) onEvent(event.event);
+      if (event.error) throw new Error(event.error);
+      if (event.reply) return event.reply;
+    }
+    if (done) throw new Error("The connection closed before the assistant answered. Please try again.");
   }
 }
 

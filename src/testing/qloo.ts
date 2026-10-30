@@ -30,6 +30,11 @@ export function fixtureQloo(options: { failBrands?: boolean; seen?: URL[] } = {}
       const type = p.get("filter.type");
       const signal = p.get("signal.interests.entities") ?? "";
       const ok = (results: unknown) => Response.json({ success: true, results });
+      // A search by name finds the fixture act, as an artist.
+      if (url.pathname === "/search")
+        return Response.json({
+          results: /fixture/i.test(p.get("query") ?? "") && p.get("types") === "urn:entity:artist" ? [{ entity_id: ACT, name: "Fixture Star", types: ["urn:entity:artist"], popularity: 0.97, properties: { short_description: "A country singer." } }] : [],
+        });
       if (url.pathname === "/entities") {
         const id = p.get("entity_ids");
         const opener = SIMILAR.indexOf(id ?? "");
