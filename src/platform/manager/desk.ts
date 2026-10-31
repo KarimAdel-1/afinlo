@@ -80,7 +80,9 @@ export function named<T extends { id: string; name: string }>(items: T[], name: 
     items.find((i) => i.id.toLowerCase() === name.trim().toLowerCase()) ??
     items.find((i) => norm(i.name) === n) ??
     items.find((i) => norm(i.name).startsWith(n)) ??
-    items.find((i) => n.length >= 4 && norm(i.name).includes(n))
+    items.find((i) => n.length >= 4 && norm(i.name).includes(n)) ??
+    // Said with more words than its name ("Patagonia partnerships team"): the longest name in them.
+    items.filter((i) => norm(i.name).length >= 4 && n.includes(norm(i.name))).sort((a, b) => b.name.length - a.name.length)[0]
   );
 }
 

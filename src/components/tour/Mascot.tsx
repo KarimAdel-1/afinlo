@@ -92,7 +92,6 @@ export function Mascot({ size = 170, thinking = false }: { size?: number; thinki
   }, [thinking]);
 
   useEffect(() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let frame = 0,
       last = performance.now(),
       t = 0;

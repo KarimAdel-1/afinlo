@@ -691,9 +691,3 @@
     font-size: 13px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .hl-mascot,
-  .hl-assist-bubble {
-    animation: none;
-  }
-}

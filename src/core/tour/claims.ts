@@ -54,7 +54,8 @@ export function unsupportedClaim(text: string): string | undefined {
 export function withoutUnsupportedClaims(text: string): { text: string; removed: number } {
   let removed = 0;
   const lines = text.split("\n").map((line) => {
-    const sentences = line.match(/[^.!?]+[.!?]*(\s+|$)/g) ?? [line];
+    // A sentence ends at a mark before a space or the line's end, so "U.S." and "4.5" stay whole.
+    const sentences = line.match(/.*?[.!?]+(?:\s+|$)|.+$/g) ?? [line];
     const kept = sentences.filter((s) => {
       if (!unsupportedClaim(s)) return true;
       removed++;

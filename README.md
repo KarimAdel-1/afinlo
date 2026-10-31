@@ -172,7 +172,7 @@ The app's **Does it work?** page reports what's measured, and nothing that isn't
 - **Specificity:** how much different acts' routes overlap, measured live from the example tours.
 - **Backtest** against public listener-city data, compared with what a booker without taste data would play, the biggest cities ([method](docs/evaluation/backtest.json), `npm run backtest`): pending. The listener data has to be recorded by hand.
 
-The tour team is measured by `npm run eval`, which writes each reply and its checks to `docs/evaluation/manager-eval.json`. Its first run against the live model is pending.
+The tour team is measured by `npm run eval`, which writes each reply and its checks to `docs/evaluation/manager-eval.json`. Its latest run against the live model passed all 21 messages, on three example tours.
 
 Limits: Fan Heat is taste affinity, not ticket demand. A sponsor match means a brand's customers love the act, not that it will sponsor; Qloo's brand results are mostly global brands, and its location signal leans them toward the tour's area. Qloo tags few venues in some cities (Berlin, Cairo), so Afinlo falls back to live-music and event venues there, and says so when there are none. Some acts have little Qloo data. Demographics are aggregate; Afinlo uses no personal data and sends nothing on anyone's behalf.
 

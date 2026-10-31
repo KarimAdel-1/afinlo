@@ -17,6 +17,7 @@ import { draftsFor, keepProspects, prospectsFor } from "../tour/work";
 import { templatePitch } from "../tour/writer";
 import { askManager, managerHistory, TurnFailed } from "./chat";
 import { LIMITS, type Role } from "./graph";
+import { textOf } from "./prompt";
 import { TOOL_BUDGET } from "./tools";
 
 testDatabase();
@@ -42,7 +43,7 @@ async function ask(
   return { ...out, events };
 }
 const results = (messages: BaseMessage[]) => messages.filter((m) => isToolMessage(m)).map((m) => String(m.content));
-const system = (m: ScriptedModel, i: number) => String(m.calls.at(i)!.messages[0].content);
+const system = (m: ScriptedModel, i: number) => m.calls.at(i)!.messages.slice(0, 2).map((x) => textOf(x)).join("\n");
 const stopOf = (plan: Plan, i: number) => plan.cities.find((c) => c.id === plan.route[i].cityId)!;
 
 test("the manager hands a question to the right specialist, who answers from its tools; its answer is the reply", async () => {
@@ -68,9 +69,10 @@ test("the manager hands a question to the right specialist, who answers from its
   assert.deepEqual(out.cards, []);
   // The specialist sees only its task: its own prompt, and the manager's words for it.
   const first = route.calls[0].messages;
-  assert.equal(first.length, 2);
-  assert.match(String(first[0].content), /^You are the route planner/);
-  assert.equal(String(first[1].content), `Why is ${stop.name} on the route?`);
+  assert.equal(first.length, 3);
+  assert.match(textOf(first[0]), /^You are the route planner/);
+  assert.match(textOf(first[1]), /^The tour: /);
+  assert.equal(String(first[2].content), `Why is ${stop.name} on the route?`);
   assert.match(system(manager, 0), /<data source="tour"/, "the tour reaches the manager as data");
   assert.deepEqual(out.events.map((e) => e.kind), ["ask", "tool", "answered"]);
   assert.equal(manager.left + route.left, 0);
@@ -189,13 +191,15 @@ test("the limits hold: the team's lookups run out, a specialist's last step and 
   await ask(plan, "The route?", { manager: new ScriptedModel([calls(["ask_route_planner", { task: "Give the route." }]), "Here."]), route });
   assert.equal(route.calls.length, LIMITS.steps);
   assert.equal(route.calls.at(-1)!.toolChoice, "none", "its last step can't call tools");
-  assert.match(system(route, -1), /answer now/);
+  assert.match(textOf(route.calls.at(-1)!.messages.at(-1)), /answer now/, "the note goes last");
+  assert.doesNotMatch(system(route, -1), /answer now/, "so what's before it stays cached");
 
   const manager = new ScriptedModel([...Array.from({ length: LIMITS.rounds }, () => calls(["act_memory", {}])), "Finally, the reply."]);
   const out = await ask(plan, "Remember anything?", { manager });
   assert.equal(out.reply, "Finally, the reply.");
   assert.equal(manager.calls.at(-1)!.toolChoice, "none");
-  assert.match(system(manager, -1), /reply to the user now/);
+  assert.match(textOf(manager.calls.at(-1)!.messages.at(-1)), /reply to the user now/, "the note goes last");
+  assert.doesNotMatch(system(manager, -1), /reply to the user now/, "so what's before it stays cached");
 });
 
 test("one round can't hand out more than the message's tasks: the rest are answered without a specialist", async () => {
@@ -232,7 +236,7 @@ test("the conversation is remembered across messages, and older turns fold into 
   const manager = new ScriptedModel([
     (m) => {
       assert.equal(m.filter((x) => isHumanMessage(x)).length, LIMITS.keep, "only the latest turns");
-      assert.match(String(m[0].content), /The user asked ten things\./, "and the summary of the rest");
+      assert.match(textOf(m[1]), /The user asked ten things\./, "and the summary of the rest");
       return `Reply ${last}`;
     },
   ]);
@@ -284,7 +288,7 @@ test("earlier turns reach the model as what was said, a specialist's answer is t
         // The first turn's handoff and the planner's answer aren't sent again: only what was said.
         assert.equal(messages.filter((m) => isToolMessage(m)).length, 0);
         assert.equal(messages.filter((m) => isAIMessage(m) && (m as AIMessage).tool_calls?.length).length, 0);
-        assert.deepEqual(messages.slice(1).map((m) => (isHumanMessage(m) ? "user" : "ai")), ["user", "ai", "user"]);
+        assert.deepEqual(messages.slice(2).map((m) => (isHumanMessage(m) ? "user" : "ai")), ["user", "ai", "user"]);
         return "Knoxville has the highest Fan Heat.";
       },
     ],
@@ -351,7 +355,7 @@ test("what's on screen comes with the message, and the manager can open a tab an
   const stop = stopOf(plan, 1);
   const manager = new ScriptedModel([
     (m) => {
-      assert.match(String(m[0].content), new RegExp(`<data source="on_screen"[^>]*>\\n\\{"tab":"Book","stop":"${stop.name}"\\}`), "the tab and stop in hand reach the manager");
+      assert.match(textOf(m.findLast((x) => isHumanMessage(x))), new RegExp(`<data source="on_screen"[^>]*>\\n\\{"tab":"Book","stop":"${stop.name}"\\}`), "the tab and stop in hand reach the manager");
       return calls(["show_on_page", { tab: "promote", city: stop.name }]);
     },
     `Here are ${stop.name}'s fans.`,

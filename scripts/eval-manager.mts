@@ -69,7 +69,7 @@ const EVERYDAY = new Set(["Nice", "Reading", "Mobile", "Split", "Bath", "Mary", 
  */
 function strayCities(plan: Plan, text: string) {
   const known = new Set([...plan.cities.map((c) => c.name), ...(plan.proof?.biggestCities ?? [])]);
-  const names = [plan.act.name, ...plan.sponsors.map((s) => s.brand.name), ...plan.supportActs.map((s) => s.act.name), ...plan.fanDna.loves.map((l) => l.entity.name), ...plan.localSpots.map((s) => s.place.name)];
+  const names = [...known, plan.act.name, ...plan.sponsors.map((s) => s.brand.name), ...plan.supportActs.map((s) => s.act.name), ...plan.fanDna.loves.map((l) => l.entity.name), ...plan.localSpots.map((s) => s.place.name)];
   let rest = text;
   for (const n of names.filter((n) => n.length > 2).sort((a, b) => b.length - a.length)) rest = rest.replace(new RegExp(escape(n), "g"), " ");
   const found = new Set<string>();
@@ -115,6 +115,7 @@ interface Message {
 const browser = `evalmanager${Date.now().toString(36)}`.slice(0, 24);
 const report: { act: string; area?: string; planId?: string; messages: Message[] }[] = [];
 let spent = 0;
+const tokens = { input: 0, cached: 0, written: 0, output: 0 };
 let expected = 0;
 for (const act of ACTS) {
   const summary = (await examplePlans()).find((p) => p.act.name === act);
@@ -132,6 +133,7 @@ for (const act of ACTS) {
     let cost = 0;
     const models = openAiModels((role, u) => {
       cost += costOf(MODELS[role].model, u);
+      for (const k of ["input", "cached", "written", "output"] as const) tokens[k] += u[k];
     });
     const started = Date.now();
     const checks: { check: string; pass: boolean; detail?: string }[] = [];
@@ -144,6 +146,8 @@ for (const act of ACTS) {
       checks.push({ check: "no city outside the tour", pass: !stray.length, detail: stray.join(", ") });
       const claim = unsupportedClaim(all);
       checks.push({ check: "no unsupported claim", pass: !claim, detail: claim });
+      const raw = all.match(/\b0\.\d{2,}\b/)?.[0];
+      checks.push({ check: "no raw Qloo score", pass: !raw, detail: raw });
       if (expect.mentions) checks.push({ check: `names ${expect.mentions}`, pass: out.reply.includes(expect.mentions) });
       if (expect.card === "change") {
         const change = out.cards.find((c) => c.kind === "change");
@@ -172,11 +176,12 @@ const passed = all.filter((m) => m.checks.every((c) => c.pass)).length;
 const times = all.flatMap((m) => (m.ms ? [m.ms] : []));
 const summary = { expected, messages: all.length, passed, failed: Math.max(expected, all.length) - passed, averageSeconds: Number((times.reduce((a, b) => a + b, 0) / Math.max(1, times.length) / 1000).toFixed(1)), totalCostUsd: Number(spent.toFixed(4)) };
 console.log(`\n${summary.passed} of ${summary.expected} messages passed every check · ${summary.averageSeconds}s on average · $${summary.totalCostUsd} in all`);
+console.log(`tokens: in ${tokens.input} (cached ${tokens.cached}, written ${tokens.written}), out ${tokens.output}`);
 writeFileSync("docs/evaluation/manager-eval.json", JSON.stringify({ generatedAt: new Date().toISOString(), models: MODELS, summary, tours: report }, null, 2) + "\n");
 
 // The eval's conversations and anything they left on the tours go.
 for (const t of ["checkpoint_writes", "checkpoint_blobs", "checkpoints"]) await db().prepare(`DELETE FROM ${t} WHERE thread_id LIKE ?`).run(`%:${browser}`);
-for (const t of ["tour_statuses", "tour_acts", "tour_chat_usage"]) await db().prepare(`DELETE FROM ${t} WHERE visitor = ?`).run(browser);
+for (const t of ["tour_statuses", "tour_acts", "tour_chat_usage", "tour_drafts", "tour_prospects"]) await db().prepare(`DELETE FROM ${t} WHERE visitor = ?`).run(browser);
 await closeDb();
 // Any failure, or fewer messages than expected, fails the command, so a release can be gated on it.
 if (summary.failed > 0 || all.length < expected) process.exitCode = 1;

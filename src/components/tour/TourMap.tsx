@@ -278,9 +278,8 @@ export function TourMap({
     const m = map.current,
       maplibre = lib.current;
     if (state !== "ready" || !m || !maplibre) return;
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (focus) m.flyTo({ center: [focus.lon, focus.lat], zoom: focus.zoom ?? 10.5, duration: reduce ? 0 : 1400, essential: true });
-    else fit(m, maplibre, [...stops, ...(home ? [home] : [])], points, reduce ? 0 : 900);
+    if (focus) m.flyTo({ center: [focus.lon, focus.lat], zoom: focus.zoom ?? 10.5, duration: 1400, essential: true });
+    else fit(m, maplibre, [...stops, ...(home ? [home] : [])], points, 900);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, focus?.lat, focus?.lon, focus?.zoom]);
 

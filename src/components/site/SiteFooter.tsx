@@ -10,8 +10,7 @@ export function SiteFooter() {
       links: [
         ["Plan a tour", "/plan"],
         ["Your tours", "/home"],
-        ["How it works", "/how-it-works"],
-        ["Does it work?", "/does-it-work"],
+        ["What it does", "/what-it-does"],
       ],
     },
     { title: "About", links: [["About Afinlo", "/about"], ["Questions & answers", "/#faq"]] },

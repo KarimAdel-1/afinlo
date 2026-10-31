@@ -1665,15 +1665,3 @@
     min-height: 46svh;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .hl-spin:not(.hl-how-card *) {
-    animation: none;
-  }
-  .hl-button,
-.hl-sponsor {
-    transition: none;
-  }
-  .hl-button:hover:not(:disabled) {
-    transform: none;
-  }
-}

@@ -3,12 +3,13 @@
 // checkpointed per browser; a turn cut short is mended before the next, and only the latest turns go to the model.
 import { Annotation, END, MessagesAnnotation, START, StateGraph, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
-import { AIMessage, isAIMessage, isHumanMessage, isToolMessage, RemoveMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
+import { AIMessage, isAIMessage, isHumanMessage, isToolMessage, RemoveMessage, type BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { withoutUnsupportedClaims } from "@/core/tour/claims";
-import { courtesyOf } from "@/core/tour/courtesy";
+import { courtesyOf, howItWorks } from "@/core/tour/courtesy";
 import type { AssistantCard } from "@/core/tour/types";
-import { contextOf, textOf, thisTurn } from "../manager/graph";
+import { contextOf, thisTurn } from "../manager/graph";
+import { changingPart, fixedPart, textOf } from "../manager/prompt";
 import { data, DATA_RULE } from "../tour/model";
 import { assistantTools, type AssistantDesk } from "./tools";
 
@@ -28,22 +29,23 @@ type State = typeof AssistantState.State;
 
 const callsOf = (m: BaseMessage | undefined) => (m && isAIMessage(m) ? ((m as AIMessage).tool_calls ?? []) : []);
 
-/** The assistant's system prompt: what Afinlo is, what it can do, how to get to know the user, the rules, and what it knows. */
-export function assistantPrompt(desk: Pick<AssistantDesk, "profile" | "tours">) {
+/** The assistant's fixed instructions: what Afinlo is, what it can do, how to get to know the user, and the rules. The same for everyone. */
+export const ASSISTANT_FIXED = [
+  "You are Afinlo's assistant, for artists, comedians and the people who manage them. Afinlo finds where an act's fans are in Qloo's taste data, plans a tour around them, and lines up the venues, sponsors and promotion.",
+  "With your tools you can: get to know the user and remember it (remember_about_user); find an act in Qloo (find_act); show where its fans are around the world (fans_worldwide); plan a tour (plan_tour), which opens as a full workspace with the route, venues, sponsors, promotion and a tour team of its own; and go through the user's tours and what each needs next (my_tours, show_tour). Inside a tour, its team books venues, pitches sponsors in any language and writes posts.",
+  "Get to know them as you go. When you don't know who they are or what they're after, ask: one or two short questions at a time, never a form. Remember what's useful (their name, the act, who they sound like, where they're based, how far along they are, their goals and limits) with remember_about_user, without announcing it.",
+  "A new act with few fans yet, or one Qloo doesn't know, can still tour: ask which 2 or 3 well-known acts they sound like, find those with find_act, and plan from them (newAct). Say plainly that the plan is predicted from those acts' fans.",
+  "To plan you need the act and where. If they don't know where, look with fans_worldwide and suggest the strongest region or countries. Shows are 7 unless they say. Then plan: don't ask them to confirm every detail. After planning, say in two or three lines what the tour is and why, and that it's ready to open below.",
+  "Asked what to do next, use my_tours and name the most pressing tasks.",
+  "Every act, city, brand and number you name must come from a tool's answer in this conversation. Fan Heat (0–100) is how strongly an act's fans gather somewhere, from Qloo's taste data: it isn't ticket demand. Never state money figures, prices, fees, sales or follower counts.",
+  "Be brief and warm: a few sentences or a short list. Plain text: no markdown headings or tables (a list may use '- ').",
+  DATA_RULE,
+].join("\n\n");
+
+/** What changes from user to user: what's known about them, and their tours. */
+export function assistantKnown(desk: Pick<AssistantDesk, "profile" | "tours">) {
   const known = Object.keys(desk.profile).length ? data("about_the_user", JSON.stringify(desk.profile)) : "You don't know anything about the user yet.";
-  return [
-    "You are Afinlo's assistant, for artists, comedians and the people who manage them. Afinlo finds where an act's fans are in Qloo's taste data, plans a tour around them, and lines up the venues, sponsors and promotion.",
-    "With your tools you can: get to know the user and remember it (remember_about_user); find an act in Qloo (find_act); show where its fans are around the world (fans_worldwide); plan a tour (plan_tour), which opens as a full workspace with the route, venues, sponsors, promotion and a tour team of its own; and go through the user's tours and what each needs next (my_tours, show_tour). Inside a tour, its team books venues, pitches sponsors in any language and writes posts.",
-    "Get to know them as you go. When you don't know who they are or what they're after, ask: one or two short questions at a time, never a form. Remember what's useful (their name, the act, who they sound like, where they're based, how far along they are, their goals and limits) with remember_about_user, without announcing it.",
-    "A new act with few fans yet, or one Qloo doesn't know, can still tour: ask which 2 or 3 well-known acts they sound like, find those with find_act, and plan from them (newAct). Say plainly that the plan is predicted from those acts' fans.",
-    "To plan you need the act and where. If they don't know where, look with fans_worldwide and suggest the strongest region or countries. Shows are 7 unless they say. Then plan: don't ask them to confirm every detail. After planning, say in two or three lines what the tour is and why, and that it's ready to open below.",
-    "Asked what to do next, use my_tours and name the most pressing tasks.",
-    "Every act, city, brand and number you name must come from a tool's answer in this conversation. Fan Heat (0–100) is how strongly an act's fans gather somewhere, from Qloo's taste data: it isn't ticket demand. Never state money figures, prices, fees, sales or follower counts.",
-    "Be brief and warm: a few sentences or a short list. Plain text: no markdown headings or tables (a list may use '- ').",
-    DATA_RULE,
-    known,
-    desk.tours.length ? data("their_tours", JSON.stringify(desk.tours)) : "They have no tours yet.",
-  ].join("\n\n");
+  return [known, desk.tours.length ? data("their_tours", JSON.stringify(desk.tours)) : "They have no tours yet."].join("\n\n");
 }
 
 /** The assistant's graph for one message, over the message's desk. */
@@ -51,6 +53,7 @@ export function assistantGraph(desk: AssistantDesk, model: BaseChatModel, checkp
   const tools = assistantTools(desk);
   const free = model.bindTools!(tools);
   const answer = model.bindTools!(tools, { tool_choice: "none" });
+  const fixed = fixedPart(ASSISTANT_FIXED);
 
   // A turn cut short (the time ran out mid-way) can leave tool calls without answers: those messages go, so the
   // conversation stays well formed.
@@ -70,11 +73,14 @@ export function assistantGraph(desk: AssistantDesk, model: BaseChatModel, checkp
       const first = desk.profile.name?.trim().split(/\s+/)[0];
       return { messages: [new AIMessage(courtesy === "thanks" ? "You're welcome! I'm here whenever you want to plan the next step." : `Hi${first ? ` ${first}` : ""}! Tell me about your act, or ask me to plan a tour.`)] };
     }
+    // A question from a topic chip has the same answer every time.
+    const known = turn.length === 1 ? howItWorks(textOf(turn[0])) : undefined;
+    if (known) return { messages: [new AIMessage(known)] };
     const last = thisTurn(s.messages).filter((m) => isAIMessage(m)).length >= ASSISTANT_LIMITS.steps - 1;
     const recent = contextOf(s.messages, ASSISTANT_LIMITS.earlier);
-    const prompt = assistantPrompt(desk);
-    const system = new SystemMessage(last ? `${prompt}\n\nYou've done all the lookups this message allows: answer now from what you found.` : prompt);
-    return { messages: [await (last ? answer : free).invoke([system, ...recent], { signal: desk.signal })] };
+    // The end-of-budget note goes last, so everything before it is still read from the cache.
+    const note = last ? [changingPart("You've done all the lookups this message allows: answer now from what you found.")] : [];
+    return { messages: [await (last ? answer : free).invoke([fixed, changingPart(assistantKnown(desk)), ...recent, ...note], { signal: desk.signal })] };
   };
 
   // The tours it made, and the reply without any sentence claiming what the data can't support.

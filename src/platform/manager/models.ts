@@ -1,7 +1,8 @@
 // The team's models: each role's model and reasoning effort from MODELS (one table for every model call Afinlo makes),
 // as LangChain chat models on OpenAI's Responses API. Nothing is stored at OpenAI, and each role keeps one prompt cache
-// key, so its long system prompt is billed at the cached rate after the first call.
+// key, so its fixed instructions (prompt.ts) are billed at the cached rate after the first call.
 import { ChatOpenAI } from "@langchain/openai";
+import type { ClientOptions } from "openai";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { AIMessage } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
@@ -18,7 +19,7 @@ import type { Usage } from "./usage";
 const MAX_TOKENS: Record<Role, number> = { manager: 800, route: 1200, venues: 1200, sponsors: 2000, promoter: 2000, summary: 400, assistant: 1500 };
 
 
-export function openAiModels(onUsage?: (role: Role, usage: Usage) => void): Models {
+export function openAiModels(onUsage?: (role: Role, usage: Usage) => void, configuration?: ClientOptions): Models {
   const made = new Map<Role, BaseChatModel>();
   return (role) => {
     let model = made.get(role);
@@ -31,13 +32,16 @@ export function openAiModels(onUsage?: (role: Role, usage: Usage) => void): Mode
         maxTokens: MAX_TOKENS[role],
         zdrEnabled: true,
         promptCacheKey: `afinlo-${role}`,
+        // Each summary is of a different conversation: explicit mode with no breakpoints skips a cache write it would never reuse.
+        ...(role === "summary" ? { promptCacheOptions: { mode: "explicit" as const } } : {}),
+        configuration,
         maxRetries: 1,
         timeout: 45_000,
         callbacks: onUsage && [
           {
             handleLLMEnd: (out: LLMResult) => {
               const u = ((out.generations[0]?.[0] as ChatGeneration | undefined)?.message as AIMessage | undefined)?.usage_metadata;
-              if (u) onUsage(role, { input: u.input_tokens ?? 0, cached: u.input_token_details?.cache_read ?? 0, output: u.output_tokens ?? 0 });
+              if (u) onUsage(role, { input: u.input_tokens ?? 0, cached: u.input_token_details?.cache_read ?? 0, written: u.input_token_details?.cache_creation ?? 0, output: u.output_tokens ?? 0 });
             },
           },
         ],

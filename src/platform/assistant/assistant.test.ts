@@ -14,6 +14,7 @@ import type { AssistantEvent } from "@/core/tour/types";
 import { savedResults } from "../tour/saved";
 import { getPlan } from "../tour/store";
 import { templatePitch } from "../tour/writer";
+import { HOW_IT_WORKS } from "@/core/tour/courtesy";
 import { askAssistant, assistantChats, assistantHistory, deleteAssistantChat } from "./chat";
 import { getProfile } from "./profile";
 
@@ -56,11 +57,15 @@ test("the assistant learns about the user, finds the act and plans the tour, whi
 
   const next = new ScriptedModel([
     (messages) => {
-      assert.match(String(messages[0].content), /"basedIn":"Nashville"/, "the next conversation starts from what's known");
+      assert.match(String(messages[1].content), /"basedIn":"Nashville"/, "the next conversation starts from what's known");
       return "Hello again.";
     },
   ]);
   await askAssistant({ browser, visitor: `v:${browser}`, chat: "chat-two", message: "Hi, what can you do?", signal: AbortSignal.timeout(30_000) }, { model: next, checkpointer: saver, client: fixtureQloo(), writer });
+  // A topic chip's question needs no model either.
+  const asker = testBrowser();
+  const chip = await askAssistant({ browser: asker, visitor: `v:${asker}`, chat: "chat-chip", message: HOW_IT_WORKS.venues.say, signal: AbortSignal.timeout(30_000) }, { model: new ScriptedModel([]), checkpointer: saver, client: fixtureQloo(), writer });
+  assert.equal(chip.reply, HOW_IT_WORKS.venues.answer);
   // A thanks needs no model: a scripted model with nothing to say would fail if asked.
   const thanks = await askAssistant({ browser, visitor: `v:${browser}`, chat: "chat-two", message: "Thanks!", signal: AbortSignal.timeout(30_000) }, { model: new ScriptedModel([]), checkpointer: saver, client: fixtureQloo(), writer });
   assert.match(thanks.reply, /You're welcome/);

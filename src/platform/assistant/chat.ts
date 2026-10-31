@@ -9,7 +9,8 @@ import type { AssistantCard, AssistantChatSummary, AssistantEvent, AssistantMess
 import { db, now } from "@/lib/db";
 import type { QlooClient } from "../taste/qloo";
 import { checkpointer } from "../manager/chat";
-import { textOf, thisTurn } from "../manager/graph";
+import { thisTurn } from "../manager/graph";
+import { textOf } from "../manager/prompt";
 import { openAiModels } from "../manager/models";
 import { usageMeter } from "../manager/usage";
 import { qlooClient } from "../tour/qloo";

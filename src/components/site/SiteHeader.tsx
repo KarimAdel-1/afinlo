@@ -6,8 +6,7 @@ import { ArrowUpRight, Menu, X } from "lucide-react";
 import { Wordmark } from "@/components/Wordmark";
 
 const LINKS = [
-  ["How it works", "/how-it-works"],
-  ["Does it work?", "/does-it-work"],
+  ["What it does", "/what-it-does"],
   ["About", "/about"],
 ] as const;
 
@@ -58,9 +57,6 @@ export function SiteHeader() {
           <Wordmark />
         </div>
         <div className="af2-header-actions">
-          <Link className="af2-header-login" href="/home">
-            Your tours
-          </Link>
           <Link className="af2-header-create" href="/plan" aria-current={path === "/plan" ? "page" : undefined}>
             Plan a tour
           </Link>
@@ -78,7 +74,7 @@ export function SiteHeader() {
       </div>
       {mobile && (
         <nav className="af2-mobile-menu" id="af2-mobile-menu" aria-label="Mobile website">
-          {[["Plan a tour", "/plan"] as const, ["Your tours", "/home"] as const, ...LINKS].map(([label, href]) => (
+          {[["Plan a tour", "/plan"] as const, ...LINKS].map(([label, href]) => (
             <Link key={href} href={href} onClick={close}>
               {label}
               <ArrowUpRight size={17} />

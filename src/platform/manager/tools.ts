@@ -125,7 +125,7 @@ function saveDraft(desk: Desk, agent: Specialist, type: AgentDraft["type"]) {
     name: "save_draft",
     description: `Saves ${what} for the user to copy and send. It's checked first: if it's refused, fix what the answer says and save again.`,
     schema: z.object({
-      to: z.string().min(2).max(120).describe(type === "pitch" ? "The brand." : type === "hold" ? "The venue." : "The stop's city."),
+      to: z.string().min(2).max(120).describe(type === "pitch" ? "The brand's name alone, as sponsor_list gives it." : type === "hold" ? "The venue's name alone." : "The stop's city."),
       language: z.string().min(2).max(40).describe("The language it's written in, in English (Spanish, Arabic)."),
       subject: z.string().max(140).optional().describe(type === "post" ? "Leave out." : "The email's subject line."),
       body: z.string().min(20).max(4000),
@@ -190,7 +190,6 @@ function routeTools(desk: Desk): Tool[] {
     return {
       city: placeOf(c),
       fanHeat: c.heat,
-      qlooAffinity: c.affinity,
       qlooCells: c.cells,
       confidence: c.confidence,
       hiddenMarket: c.hidden,
@@ -207,7 +206,7 @@ function routeTools(desk: Desk): Tool[] {
     routeOverview(desk, "route"),
     make(desk, "route", {
       name: "city_details",
-      description: "One city: its Fan Heat and what's behind it (Qloo's affinity and cells), its tour score, and why it is or isn't on the route.",
+      description: "One city: its Fan Heat and what's behind it (Qloo's cells), its tour score, and why it is or isn't on the route.",
       schema: z.object({ city: cityArg }),
       label: ({ city }) => `Looking at ${city}`,
       run: ({ city }) => {
@@ -321,7 +320,7 @@ function venueTools(desk: Desk): Tool[] {
         const guide = await guideFor(desk, c.id);
         return {
           city: placeOf(c),
-          venues: guide.venues.map((v) => ({ venue: v.name, kind: v.kind, address: v.address, rating: v.rating, fansAffinity: v.affinity, status: VENUE_LABELS[(statusOf(desk, "venue", v.id)?.status ?? "to_contact") as VenueStatus] })),
+          venues: guide.venues.map((v) => ({ venue: v.name, kind: v.kind, address: v.address, rating: v.rating, status: VENUE_LABELS[(statusOf(desk, "venue", v.id)?.status ?? "to_contact") as VenueStatus] })),
           notes: guide.notes,
         };
       },

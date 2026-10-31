@@ -71,13 +71,14 @@ export async function askJson<T>(
   delete jsonSchema.$schema;
   const { usageMeter } = await import("../manager/usage");
   const meter = usageMeter("plan");
+  // Each plan's facts are its own: explicit mode with no breakpoints skips a cache write this call would never reuse.
   const ask = async (format: OpenAI.Responses.ResponseFormatTextConfig, instructions = system) => {
     const response = await client!.responses.create(
-      { model: use.model, instructions, input: user, reasoning: { effort: use.effort }, max_output_tokens: options.maxTokens, text: { format }, store: false },
+      { model: use.model, instructions, input: user, reasoning: { effort: use.effort }, max_output_tokens: options.maxTokens, text: { format }, store: false, prompt_cache_options: { mode: "explicit" } },
       { signal: options.signal },
     );
     const u = response.usage;
-    if (u) meter.add(options.role, { input: u.input_tokens, cached: u.input_tokens_details?.cached_tokens ?? 0, output: u.output_tokens });
+    if (u) meter.add(options.role, { input: u.input_tokens, cached: u.input_tokens_details?.cached_tokens ?? 0, written: u.input_tokens_details?.cache_write_tokens ?? 0, output: u.output_tokens });
     return response.output_text;
   };
   let text: string;

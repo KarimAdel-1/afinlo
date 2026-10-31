@@ -308,8 +308,3 @@
   justify-content: center;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hl-dock-tip {
-    transition: none;
-  }
-}

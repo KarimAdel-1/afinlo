@@ -39,7 +39,7 @@ function useMagnify(list: RefObject<HTMLUListElement | null>) {
   useEffect(() => {
     const ul = list.current;
     if (!ul) return;
-    const still = matchMedia("(prefers-reduced-motion: reduce), (hover: none)");
+    const still = matchMedia("(hover: none)");
     let items: HTMLElement[] = [];
     let centers: number[] = [];
     let sizes: number[] = [];

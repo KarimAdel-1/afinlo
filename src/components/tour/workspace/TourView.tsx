@@ -137,7 +137,7 @@ export function TourView({
     goTo: (t, s) => {
       setTab(t);
       if (s) setStop(s);
-      window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
     rerun: (change) => void rerun(change),
     pointAt: setActiveSpot,

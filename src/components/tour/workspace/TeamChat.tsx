@@ -80,7 +80,7 @@ export function TeamChat({ plan, actions, onTrack, context }: { plan: Plan; acti
   }, [plan.id]);
 
   useEffect(() => {
-    if (open) end.current?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    if (open) end.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [open, messages, steps]);
 
   const show = (v: boolean) => {

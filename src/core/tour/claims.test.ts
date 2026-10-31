@@ -50,4 +50,7 @@ test("a reply keeps everything but the sentences that claim too much, and says s
   assert.match(out.text, /Boise: a hidden market/);
   assert.match(out.text, /left out a figure or claim/);
   assert.deepEqual(withoutUnsupportedClaims("Nothing to remove here."), { text: "Nothing to remove here.", removed: 0 });
+  // What's left keeps every word: a mark inside "U.S." or "4.5" doesn't end a sentence.
+  const kept = withoutUnsupportedClaims("The 4-show U.S. tour has a Fan Heat of 4.5 at St. Louis. Tickets cost $40. Open it below.");
+  assert.equal(kept.text, "The 4-show U.S. tour has a Fan Heat of 4.5 at St. Louis. Open it below.\n\n(I left out a figure or claim that Qloo's data doesn't support.)");
 });

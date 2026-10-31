@@ -13,8 +13,9 @@ import { qlooClient } from "../tour/qloo";
 import { prospectsFor } from "../tour/work";
 import { actMemory, tourOf, tracksFor } from "../tour/tracker";
 import { openDesk } from "./desk";
-import { agentOf, managerGraph, textOf, thisTurn, type Models } from "./graph";
+import { agentOf, managerGraph, thisTurn, type Models } from "./graph";
 import { openAiModels } from "./models";
+import { textOf } from "./prompt";
 import { usageMeter } from "./usage";
 
 export interface ManagerDeps {

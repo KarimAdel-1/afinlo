@@ -14,7 +14,8 @@ import { courtesyOf } from "@/core/tour/courtesy";
 import { SPECIALIST_LABELS, SPECIALISTS, type ManagerCard, type Specialist } from "@/core/tour/types";
 import { data } from "../tour/model";
 import type { Desk } from "./desk";
-import { managerPrompt, specialistPrompt, SUMMARY_PROMPT, TEAM } from "./team";
+import { changingPart, fixedPart, textOf, withNote } from "./prompt";
+import { MANAGER_FIXED, managerTour, screenNote, specialistFixed, specialistTour, SUMMARY_PROMPT, TEAM } from "./team";
 import { managerTools, teamTools } from "./tools";
 
 /** Whose model it is: the manager's, a specialist's, the summarizer's, or the assistant's on Home. */
@@ -48,7 +49,6 @@ export const ManagerState = Annotation.Root({
 });
 type State = typeof ManagerState.State;
 
-export const textOf = (m: BaseMessage | undefined) => (!m ? "" : typeof m.content === "string" ? m.content : m.text);
 /** The current turn: the user's last message and what followed it. */
 export const thisTurn = (messages: BaseMessage[]) => messages.slice(Math.max(0, messages.findLastIndex((m) => isHumanMessage(m))));
 export const agentOf = (tool: string) => SPECIALISTS.find((a) => TEAM[a].handoff === tool);
@@ -94,13 +94,14 @@ const describe = (card: ManagerCard) =>
 /** A specialist for one task: its model and tools in a loop until it answers, the last of LIMITS.steps calls without tools. */
 export function specialist(agent: Specialist, desk: Desk, model: BaseChatModel) {
   const tools = teamTools(agent, desk);
-  const prompt = specialistPrompt(agent, desk.plan);
+  const fixed = fixedPart(specialistFixed(agent));
   const free = model.bindTools!(tools);
   const answer = model.bindTools!(tools, { tool_choice: "none" });
   const think = async (s: typeof MessagesAnnotation.State) => {
     const last = s.messages.filter((m) => isAIMessage(m)).length >= LIMITS.steps - 1;
-    const system = new SystemMessage(last ? `${prompt} You've done all the lookups this task allows: answer now from what you found.` : prompt);
-    return { messages: [await (last ? answer : free).invoke([system, ...s.messages], { signal: desk.signal })] };
+    // The end-of-budget note goes last, so everything before it is still read from the cache.
+    const note = last ? [changingPart("You've done all the lookups this task allows: answer now from what you found.")] : [];
+    return { messages: [await (last ? answer : free).invoke([fixed, changingPart(specialistTour(desk.plan)), ...s.messages, ...note], { signal: desk.signal })] };
   };
   return new StateGraph(MessagesAnnotation)
     .addNode("think", think)
@@ -111,17 +112,20 @@ export function specialist(agent: Specialist, desk: Desk, model: BaseChatModel) 
     .compile({ checkpointer: false, name: agent });
 }
 
+/** The manager's handoff tools, one per specialist. */
+export const HANDOFFS = SPECIALISTS.map((a) => ({
+  name: TEAM[a].handoff,
+  description: TEAM[a].does,
+  schema: z.object({ task: z.string().min(3).max(1200).describe("What to find out or do, standing on its own: the cities, brands, venues and language by name.") }),
+}));
+
 /** The manager's graph for one turn of the conversation, over the turn's desk. */
 export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseCheckpointSaver) {
   const own = managerTools(desk);
-  const handoffs = SPECIALISTS.map((a) => ({
-    name: TEAM[a].handoff,
-    description: TEAM[a].does,
-    schema: z.object({ task: z.string().min(3).max(1200).describe("What to find out or do, standing on its own: the cities, brands, venues and language by name.") }),
-  }));
   const model = models("manager");
-  const free = model.bindTools!([...handoffs, ...own]);
-  const reply = model.bindTools!([...handoffs, ...own], { tool_choice: "none" });
+  const free = model.bindTools!([...HANDOFFS, ...own]);
+  const reply = model.bindTools!([...HANDOFFS, ...own], { tool_choice: "none" });
+  const fixed = fixedPart(MANAGER_FIXED);
 
   // Before the manager reads the conversation: a turn cut short (the time ran out mid-way) can leave tool calls without
   // answers, and those messages go, so the conversation stays well formed; a long conversation's older turns fold into
@@ -161,9 +165,10 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
     const asked = turn.filter((m) => isToolMessage(m) && agentOf(m.name ?? "")).length;
     const rounds = turn.filter((m) => callsOf(m).length).length;
     const last = asked >= LIMITS.asks || rounds >= LIMITS.rounds;
-    const prompt = managerPrompt(desk.plan, s.summary, desk.context);
-    const system = new SystemMessage(last ? `${prompt}\n\nThe team has done all it can for this message: reply to the user now.` : prompt);
-    return { messages: [await (last ? reply : free).invoke([system, ...contextOf(s.messages)], { signal: desk.signal })] };
+    const messages = withNote(contextOf(s.messages), screenNote(desk.plan, desk.context));
+    // The end-of-budget note goes last, so everything before it is still read from the cache.
+    const note = last ? [changingPart("The team has done all it can for this message: reply to the user now.")] : [];
+    return { messages: [await (last ? reply : free).invoke([fixed, changingPart(managerTour(desk.plan, s.summary)), ...messages, ...note], { signal: desk.signal })] };
   };
 
   // The manager's tool calls, each to its node: a specialist, or the manager's own tools. No calls: the reply is done.

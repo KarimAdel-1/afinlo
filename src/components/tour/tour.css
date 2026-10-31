@@ -1078,11 +1078,6 @@
     display: none;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .hl-tourmap-wait {
-    animation: none;
-  }
-}
 
 /* A window over the page (an email draft): its title, its fields, its buttons. */
 .hl-dialog {
@@ -1442,4 +1437,79 @@
 .hl-kept li small {
   color: var(--hl-muted);
   font-size: 12.5px;
+}
+
+/* The tour team looks like the assistant on Home: a solid box, a white composer inside it, the same chips and send button. */
+.hl-teamchat {
+  border-color: #e6e5f2;
+  background: #f6f6fb;
+  backdrop-filter: none;
+  box-shadow: 0 30px 60px -36px rgba(36, 32, 67, 0.45);
+}
+.hl-teamchat-head {
+  padding: 16px 20px;
+  border-bottom: 0;
+}
+.hl-teamchat-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--hl-blue);
+  color: #fff;
+}
+.hl-teamchat-head b {
+  font-size: 15px;
+}
+.hl-team-log {
+  padding: 4px 20px 20px;
+}
+.hl-team-log > .hl-hint {
+  margin: 0;
+  color: var(--hl-ink);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.hl-team-log .hl-chip-button {
+  padding: 9px 16px;
+  border: 1px solid #e6e5f2;
+  border-radius: 100px;
+  background: #fff;
+  color: var(--hl-ink);
+  font-size: 14px;
+  font-weight: 500;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.hl-team-log .hl-chip-button:hover {
+  border-color: #c9c5ff;
+  transform: translateY(-1px);
+}
+.hl-team-msg.user {
+  background: var(--hl-blue);
+  color: #fff;
+}
+.hl-team-msg:not(.user) {
+  border-color: #e6e5f2;
+}
+.hl-team-ask {
+  align-items: center;
+  gap: 10px;
+  margin: 0 6px 6px;
+  padding: 10px 10px 10px 12px;
+  border: 0;
+  border-radius: 21px;
+  background: #fff;
+  box-shadow: 0 1px 0 #ecebf7 inset;
+}
+.hl-teamchat-toggle {
+  flex-shrink: 0;
+  background: #f6f6fb;
+}
+.hl-team-ask .hl-button {
+  width: 44px;
+  height: 44px;
+}
+.hl-team-ask .hl-button:disabled {
+  background: #eef0ff;
+  color: var(--hl-blue);
+  opacity: 1;
 }

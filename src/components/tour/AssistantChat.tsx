@@ -23,6 +23,7 @@ import {
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
+import { HOW_IT_WORKS } from "@/core/tour/courtesy";
 import type { AssistantCard, AssistantChatSummary, AssistantEvent, AssistantMessage } from "@/core/tour/types";
 import { streamAssistant } from "./client";
 import { Mascot } from "./Mascot";
@@ -57,27 +58,27 @@ const TOPICS: { icon: LucideIcon; label: string; say: string }[] = [
   {
     icon: RouteIcon,
     label: "Route",
-    say: "How do you choose a tour's cities and their order?",
+    say: HOW_IT_WORKS.route.say,
   },
   {
     icon: Warehouse,
     label: "Venues",
-    say: "How do you find venues for a tour?",
+    say: HOW_IT_WORKS.venues.say,
   },
   {
     icon: Handshake,
     label: "Sponsors",
-    say: "How do you find sponsors, and what do you send them?",
+    say: HOW_IT_WORKS.sponsors.say,
   },
   {
     icon: Users,
     label: "Fans",
-    say: "What can you tell me about an act's fans?",
+    say: HOW_IT_WORKS.fans.say,
   },
   {
     icon: Megaphone,
     label: "Promotion",
-    say: "How do you help promote the shows?",
+    say: HOW_IT_WORKS.promotion.say,
   },
 ];
 /** What floats beside the mascot: a hello, and something to ask. */
@@ -200,7 +201,7 @@ export function AssistantChat({ hasTours, name, chat: initialChat }: { hasTours:
     if (messages.length || steps)
       end.current?.scrollIntoView({
         block: "nearest",
-        behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        behavior: "smooth",
       });
   }, [messages, steps]);
 
