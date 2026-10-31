@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Download, MapPin, TrendingUp } from "lucide-react";
@@ -11,6 +12,7 @@ import "@/components/tour/base.css";
 import "@/components/tour/deck.css";
 import { placeOf } from "@/core/tour/regions";
 import type { Plan } from "@/core/tour/types";
+import { deckBrowser } from "@/platform/tour/pdf";
 import { getPlan } from "@/platform/tour/store";
 
 export async function generateMetadata({ params }: PageProps<"/deck/[id]">): Promise<Metadata> {
@@ -24,6 +26,7 @@ const PAGES = 5;
 function PageFoot({ plan, n }: { plan: Plan; n: number }) {
   return (
     <footer className="deck-foot">
+      <Image src="/brand/afinlo-logo-tight.png" alt="Afinlo" width={84} height={20} />
       <span>
         {plan.act.name} · Tour partnership · {DATE.format(new Date(plan.createdAt))}
       </span>
@@ -38,7 +41,7 @@ function PageFoot({ plan, n }: { plan: Plan; n: number }) {
  * A plan as a sponsor pitch deck: five A4 landscape pages, made to be sent to a brand. The server prints this page to
  * PDF (src/platform/tour/pdf.ts); it can also be printed from the browser.
  */
-export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
+export default async function DeckPage({ params, searchParams }: PageProps<"/deck/[id]">) {
   const plan = await getPlan((await params).id);
   if (!plan) notFound();
   const city = (id: string) => plan.cities.find((c) => c.id === id);
@@ -56,33 +59,41 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
           <ArrowLeft size={15} aria-hidden /> Back to the tour
         </Link>
         <div className="deck-bar-actions">
-          <PrintButton />
-          <a className="hl-button hl-button-small" href={`/api/tour/plan/${plan.id}/pdf`}>
-            <Download size={15} aria-hidden /> Download PDF
-          </a>
+          <PrintButton auto={(await searchParams).print === "1"} />
+          {/* A server without a browser can't make the PDF: the print dialog above saves one instead. */}
+          {deckBrowser() && (
+            <a className="hl-button hl-button-small" href={`/api/tour/plan/${plan.id}/pdf`}>
+              <Download size={15} aria-hidden /> Download PDF
+            </a>
+          )}
         </div>
       </div>
 
       <div className="deck-pages">
         <section className="deck-page deck-cover">
-          <div className="deck-cover-copy">
-            <Avatar name={plan.act.name} image={plan.act.image} size={128} />
-            <h1>{plan.act.name}</h1>
-            <p className="deck-headline">{plan.pitch.headline}</p>
-            <ul className="deck-facts">
-              <li>
-                <b>{route.length}</b> cities
-              </li>
-              <li>
-                <b>{hiddenOnRoute}</b> hidden {hiddenOnRoute === 1 ? "market" : "markets"}
-              </li>
-              <li>
-                <b>{totalKm.toLocaleString("en-US")}</b> km
-              </li>
-            </ul>
-          </div>
-          <div className="deck-cover-map">
-            <StaticMap points={plan.heatPoints} stops={planStops(plan)} width={620} height={440} label={`Where ${plan.act.name}'s fans are, with the tour's stops`} />
+          <div className="deck-hero">
+            <div className="deck-cover-copy">
+              <div className="deck-act">
+                <Avatar name={plan.act.name} image={plan.act.image} size={128} />
+                <span>Tour partnership</span>
+              </div>
+              <h1>{plan.act.name}</h1>
+              <p className="deck-headline">{plan.pitch.headline}</p>
+              <ul className="deck-facts">
+                <li>
+                  <b>{route.length}</b> cities
+                </li>
+                <li>
+                  <b>{hiddenOnRoute}</b> hidden {hiddenOnRoute === 1 ? "market" : "markets"}
+                </li>
+                <li>
+                  <b>{totalKm.toLocaleString("en-US")}</b> km
+                </li>
+              </ul>
+            </div>
+            <div className="deck-cover-map">
+              <StaticMap points={plan.heatPoints} stops={planStops(plan)} width={620} height={830} label={`Where ${plan.act.name}'s fans are, with the tour's stops`} />
+            </div>
           </div>
           <PageFoot plan={plan} n={1} />
         </section>
@@ -91,7 +102,7 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
           <h2>The audience</h2>
           <p className="deck-lead">{plan.pitch.audience}</p>
           <div className="deck-cols">
-            <div>
+            <div className="deck-card deck-card-blue">
               <h3>Their taste</h3>
               <div className="hl-tags">
                 {plan.fanDna.tags.slice(0, 10).map((t) => (
@@ -101,7 +112,7 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
                 ))}
               </div>
             </div>
-            <div>
+            <div className="deck-card">
               <h3>Age, against Qloo&apos;s average audience</h3>
               {plan.fanDna.demographics ? (
                 <div className="hl-skews">
@@ -111,10 +122,6 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
                       <span className="hl-skew-track" aria-hidden>
                         <span className={a.skew < 0 ? "neg" : ""} style={a.skew >= 0 ? { left: "50%", width: `${Math.min(50, a.skew * 50)}%` } : { right: "50%", width: `${Math.min(50, -a.skew * 50)}%` }} />
                       </span>
-                      <b>
-                        {a.skew > 0 ? "+" : ""}
-                        {a.skew.toFixed(2)}
-                      </b>
                     </div>
                   ))}
                 </div>
@@ -122,7 +129,7 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
                 <p className="hl-hint">Qloo returned no demographics for this audience.</p>
               )}
             </div>
-            <div>
+            <div className="deck-card deck-card-soft">
               <h3>What they also love</h3>
               <ul className="deck-loves">
                 {plan.fanDna.loves.map((l) => (
@@ -140,7 +147,8 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
         <section className="deck-page">
           <h2>Where the fans are</h2>
           <p className="deck-lead">{plan.pitch.markets}</p>
-          <ol className="deck-route">
+          <div className="deck-split">
+          <ol className="deck-route deck-card">
             {route.map((c, i) => (
               <li key={c.id}>
                 <span className={c.hidden ? "lime" : ""}>{i + 1}</span>
@@ -160,11 +168,22 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
             ))}
           </ol>
           {plan.proof && (
-            <p className="deck-proof">
-              This route averages Fan Heat <b>{plan.proof.route}</b>. The {plan.proof.biggestCities.length} biggest cities in {plan.area ?? "the area"} average{" "}
-              <b>{plan.proof.biggest}</b>: {plan.proof.biggestCities.join(", ")}.
-            </p>
+            <aside className="deck-proof deck-card deck-card-blue">
+              <h3>Against the obvious tour</h3>
+              <div>
+                <b>{plan.proof.route}</b>
+                <span>average Fan Heat on this route</span>
+              </div>
+              <div>
+                <b>{plan.proof.biggest}</b>
+                <span>
+                  in the {plan.proof.biggestCities.length} biggest cities in {plan.area ?? "the area"}
+                </span>
+              </div>
+              <small>{plan.proof.biggestCities.join(", ")}</small>
+            </aside>
           )}
+          </div>
           <p className="deck-note">
             {plan.signal.basis === "named" && `Predicted: Qloo doesn't know ${plan.act.name} yet, so these are the fans of ${plan.signal.similar.map((a) => a.name).join(", ")}. `}
             Fan Heat is where this audience over-indexes, from Qloo&apos;s heatmap: 100 is the act&apos;s strongest city. Hidden markets are strong cities outside the
@@ -219,12 +238,12 @@ export default async function DeckPage({ params }: PageProps<"/deck/[id]">) {
           <h2>The partnership</h2>
           {plan.pitch.ask && <p className="deck-lead">{plan.pitch.ask}</p>}
           <div className="deck-cols deck-cols-2">
-            <div>
+            <div className="deck-card">
               <h3>The tour</h3>
               <p>{plan.pitch.tourBrief}</p>
             </div>
             {!!plan.supportActs.length && (
-              <div>
+              <div className="deck-card deck-card-soft">
                 <h3>On the bill</h3>
                 <ul className="hl-openers">
                   {plan.supportActs.slice(0, 3).map((s) => (

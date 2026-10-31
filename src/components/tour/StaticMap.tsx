@@ -1,7 +1,8 @@
-// A tour as a still map, drawn on the server: Natural Earth's land (world-atlas, public domain), Qloo's heatmap as soft
-// dots in the live map's colours, the route (straight for a drive, along the globe for a flight) and the numbered
+// A tour as a still map, drawn on the server: Natural Earth's land (world-atlas, public domain), Qloo's heatmap as a
+// smooth field in the live map's colours, the route (straight for a drive, along the globe for a flight) and the numbered
 // stops. For the places a live map doesn't suit: the landing page's examples, the info pages, and the PDF deck a
 // headless browser prints.
+import { deflateSync } from "node:zlib";
 import { geoMercator, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
@@ -19,8 +20,59 @@ export interface StaticStop {
 
 const topology = land as unknown as Topology<{ land: GeometryCollection }>;
 const LAND = feature(topology, topology.objects.land);
-/** Colour steps: each dot takes the nearest, and the dots of one step are drawn as one shape. */
-const STEPS = 16;
+/** The heat image's pixels per unit of the map: a blur needs few, and few keep the page small. */
+const HEAT_SCALE = 0.5;
+/** Where the hottest places sit on the colour scale, as on the live map: near the top, short of its last colour. */
+const HEAT_TOP = 0.85;
+
+const CRC = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+/** A PNG chunk: its length, type, data and checksum. */
+function chunk(type: string, data: Buffer) {
+  const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+  let crc = 0xffffffff;
+  for (const byte of body) crc = CRC[(crc ^ byte) & 255] ^ (crc >>> 8);
+  const out = Buffer.alloc(body.length + 8);
+  out.writeUInt32BE(data.length, 0);
+  body.copy(out, 4);
+  out.writeUInt32BE((crc ^ 0xffffffff) >>> 0, body.length + 4);
+  return out;
+}
+
+/**
+ * Qloo's cells as one smooth field, as the live map's heat layer draws them: each cell a Gaussian weighted by its density,
+ * added up, and coloured from the same scale. An image rather than vector shapes, so a blur prints the same everywhere.
+ */
+function heatImage(cells: { x: number; y: number; sigma: number; density: number }[], width: number, height: number) {
+  const w = Math.ceil(width * HEAT_SCALE),
+    h = Math.ceil(height * HEAT_SCALE);
+  const field = new Float32Array(w * h);
+  for (const c of cells) {
+    const sigma = c.sigma * HEAT_SCALE,
+      reach = Math.ceil(sigma * 3),
+      cx = c.x * HEAT_SCALE,
+      cy = c.y * HEAT_SCALE;
+    for (let y = Math.max(0, Math.floor(cy - reach)); y < Math.min(h, cy + reach); y++)
+      for (let x = Math.max(0, Math.floor(cx - reach)); x < Math.min(w, cx + reach); x++) field[y * w + x] += c.density * Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * sigma * sigma));
+  }
+  const lit = Array.from(field).filter((v) => v > 0).sort((a, b) => a - b);
+  const top = lit[Math.floor(lit.length * 0.98)] ?? 1;
+  const rows = Buffer.alloc((w * 4 + 1) * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const [r, g, b, a] = heatColor(Math.pow(Math.min(1, field[y * w + x] / top), 0.65) * HEAT_TOP);
+      rows.set([Math.round(r), Math.round(g), Math.round(b), Math.round(a * 255)], y * (w * 4 + 1) + 1 + x * 4);
+    }
+  const head = Buffer.alloc(13);
+  head.writeUInt32BE(w, 0);
+  head.writeUInt32BE(h, 4);
+  head.set([8, 6], 8);
+  const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", head), chunk("IDAT", deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
 
 export function StaticMap({
   points = [],
@@ -49,53 +101,29 @@ export function StaticMap({
   projection.clipExtent([[0, 0], [width, height]]);
   const path = geoPath(projection);
   const at = (lon: number, lat: number) => projection([lon, lat]) ?? [-99, -99];
-  // A dot for each of Qloo's cells, about the size of its box, in its own colour. Where the map is too small to show every
-  // cell, a dot stands for the strongest of the cells under it. The strongest are drawn last, so no weaker dot covers them.
+  // Each of Qloo's cells, as wide as its box or the blur a small map needs to read as a field.
   const grid = heatGrid(points);
-  const dots = new Map<string, { x: number; y: number; r: number; w: number }>();
-  for (const [lat, lon, w] of points) {
-    if (cellDensity(w) < 0.03) continue;
+  const cells = points.flatMap(([lat, lon, w]) => {
+    const density = cellDensity(w);
+    if (density < 0.02) return [];
     const [south, west, north, east] = cellBox(lat, lon, grid);
     const [x0, y0] = at(west, north),
       [x1, y1] = at(east, south);
-    if (x1 < -20 || y1 < -20 || x0 > width + 20 || y0 > height + 20) continue;
-    const r = Math.max(2, Math.min(14, 0.7 * Math.sqrt((x1 - x0) * (y1 - y0)))),
-      x = (x0 + x1) / 2,
-      y = (y0 + y1) / 2;
-    const key = `${Math.round(x / r)},${Math.round(y / r)}`;
-    if ((dots.get(key)?.w ?? -1) < w) dots.set(key, { x, y, r, w });
-  }
-  const steps = new Map<number, string>();
-  for (const d of [...dots.values()].sort((a, b) => a.w - b.w)) {
-    const step = Math.max(1, Math.round(cellDensity(d.w) * STEPS));
-    const r = d.r.toFixed(1);
-    steps.set(step, (steps.get(step) ?? "") + `M${(d.x - d.r).toFixed(1)} ${d.y.toFixed(1)}a${r} ${r} 0 1 0 ${(2 * d.r).toFixed(1)} 0a${r} ${r} 0 1 0 ${(-2 * d.r).toFixed(1)} 0`);
-  }
-  const shapes = [...steps].sort((a, b) => a[0] - b[0]).map(([step, d]) => {
-    const [r, g, b, a] = heatColor(step / STEPS);
-    return { d, fill: `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`, opacity: a };
+    if (x1 < -60 || y1 < -60 || x0 > width + 60 || y0 > height + 60) return [];
+    return [{ x: (x0 + x1) / 2, y: (y0 + y1) / 2, sigma: Math.max(Math.min(width, height) * 0.016, 0.8 * Math.sqrt((x1 - x0) * (y1 - y0))), density }];
   });
-  const sizes = [...dots.values()].map((d) => d.r);
-  const blur = sizes.length ? (sizes.reduce((a, b) => a + b, 0) / sizes.length) * 0.55 : 1;
+  const heat = cells.length ? heatImage(cells, width, height) : undefined;
   const legs = stops.slice(1).map((s, i) => {
     const from = stops[i];
     const line = s.leg === "fly" ? flightPath(from, s, 24) : [[from.lon, from.lat], [s.lon, s.lat]];
     return { fly: s.leg === "fly", d: "M" + line.map(([lon, lat]) => at(lon, lat).map((v) => v.toFixed(1)).join(",")).join("L") };
   });
-  const id = label.replace(/[^a-z0-9]/gi, "").slice(0, 24) || "map";
 
   return (
     <svg className="hl-staticmap" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
-      <defs>
-        <filter id={`blur-${id}`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation={blur.toFixed(2)} />
-        </filter>
-      </defs>
       <rect width={width} height={height} fill="#dcdcf5" />
       <path d={path(LAND) ?? ""} fill="#f7f7fa" stroke="#e4e3f2" strokeWidth={0.8} />
-      <g filter={`url(#blur-${id})`}>
-        {shapes.map((p, i) => p.d && <path key={i} d={p.d} fill={p.fill} fillOpacity={p.opacity.toFixed(2)} />)}
-      </g>
+      {heat && <image href={heat} width={width} height={height} preserveAspectRatio="none" />}
       {legs.map((l, i) => (
         <g key={i}>
           <path d={l.d} fill="none" stroke="#fff" strokeWidth={5} strokeLinecap="round" opacity={0.85} />
@@ -106,9 +134,9 @@ export function StaticMap({
         const [x, y] = at(s.lon, s.lat);
         return (
           <g key={i} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}>
-            <circle r={numbered ? 10.5 : 5} fill={s.hidden ? "#e0ddfa" : "#262a3f"} stroke="#fff" strokeWidth={2.5} />
+            <circle r={numbered ? 10.5 : 5} fill={s.hidden ? "#e0ddfa" : "#262a3f"} stroke={s.hidden ? "#4336ff" : "#fff"} strokeWidth={2.5} />
             {numbered && (
-              <text textAnchor="middle" dy="0.36em" fontSize={10.5} fontWeight={700} fill="#fff" fontFamily="var(--font-display), sans-serif">
+              <text textAnchor="middle" dy="0.36em" fontSize={10.5} fontWeight={700} fill={s.hidden ? "#4336ff" : "#fff"} fontFamily="var(--font-display), sans-serif">
                 {i + 1}
               </text>
             )}

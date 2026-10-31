@@ -90,7 +90,7 @@ flowchart LR
 - The writer (`writer.ts`) sees only scored results with their IDs. A draft that names a city or brand outside the plan, or states a money figure or percentage, is replaced by a plain template, and the plan says so. Without a language model, the pitch, the hold requests and the follow-ups are plain templates drafted from the plan's facts, and the tour team says it needs a key.
 - Plans never change: a change makes a new plan, and the tour keeps its first plan's ID, so where each venue and sponsor stands carries over (`tracker.ts`). Tours, statuses and what's remembered about acts are kept per browser, by a visitor cookie (`saved.ts`, `tracker.ts`).
 - Each stage streams to the page as it starts. Per-visitor and daily limits protect the Qloo quota.
-- The PDF deck is the `/deck/[id]` page printed by a headless Chrome or Edge on the server (`pdf.ts`), once per plan.
+- The PDF deck is the `/deck/[id]` page printed by a headless Chrome or Edge on the server (`pdf.ts`), once per plan. A host with neither, such as Vercel, opens the deck in the browser's print dialog instead, which saves the same PDF.
 
 Full details, including every scoring rule: the app's [How it works](src/app/(site)/how-it-works/page.tsx) page.
 

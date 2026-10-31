@@ -1,12 +1,16 @@
-/* The pitch deck: A4 landscape pages, on screen as a stack of sheets, in print one sheet per page. */
+/* The pitch deck: A4 landscape pages in the website's look (bold headings, rounded cards, blue and lavender on the
+   page's grey), on screen as a stack of sheets, in print one sheet per page. */
 @page {
   size: A4 landscape;
   margin: 0;
 }
 .deck {
+  --deck-canvas: #eeeef0;
+  --deck-paper: #f9f9fa;
+  --deck-lavender: #e4e3f8;
   min-height: 100vh;
   padding: 0 0 56px;
-  background: #e6e6ee;
+  background: #dcdce4;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -20,7 +24,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 14px 20px;
-  background: rgba(230, 230, 238, 0.92);
+  background: rgba(220, 220, 228, 0.92);
   backdrop-filter: blur(12px);
 }
 .deck-bar-actions {
@@ -39,148 +43,226 @@
   width: 297mm;
   height: 210mm;
   margin: 0 auto 24px;
-  padding: 16mm 18mm 13mm;
+  padding: 13mm 14mm 19mm;
   overflow: hidden;
-  background: #fff;
+  background: var(--deck-canvas);
   box-shadow: 0 24px 60px -36px rgba(36, 32, 67, 0.55);
   break-after: page;
 }
+.deck-page h1,
 .deck-page > h2 {
-  font-size: 34px;
-  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+.deck-page > h2 {
+  font-size: 48px;
+  line-height: 1.05;
 }
 .deck-lead {
-  max-width: 230mm;
-  margin-top: 6mm !important;
-  font-family: var(--font-display), sans-serif;
-  font-size: 21px;
+  max-width: 235mm;
+  margin-top: 4mm !important;
+  font-size: 18px;
   line-height: 1.45 !important;
-  letter-spacing: -0.015em;
-  color: #2f3247;
-}
-.deck-cols h3 {
-  margin-bottom: 4mm;
-  font-family: var(--font-body), sans-serif;
-  font-size: 14px;
-  letter-spacing: 0;
-  font-weight: 700;
-  color: var(--hl-blue);
+  color: var(--hl-ink);
 }
 .deck-foot {
   position: absolute;
-  left: 18mm;
-  right: 18mm;
-  bottom: 8mm;
-  display: flex;
-  justify-content: space-between;
+  left: 14mm;
+  right: 14mm;
+  bottom: 7mm;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8mm;
   font-size: 11px;
-  color: var(--hl-subtle);
+  color: #626574;
 }
-.deck-proof {
-  max-width: 230mm;
-  margin-top: 6mm !important;
-  font-size: 15px;
-  color: #2f3247;
-}
-.deck-proof b {
-  font-family: var(--font-display), sans-serif;
-  font-size: 19px;
-  color: var(--hl-blue);
+.deck-foot img {
+  width: 84px;
+  height: auto;
 }
 .deck-note {
-  margin-top: auto !important;
-  padding-bottom: 6mm;
-  max-width: 220mm;
-  font-size: 12px;
-  color: var(--hl-muted);
+  margin-top: 5mm !important;
+  max-width: 235mm;
+  font-size: 11px;
+  line-height: 1.5 !important;
+  color: #626574;
+}
+.deck-card {
+  min-width: 0;
+  padding: 8mm;
+  border: 1px solid #e2e2e8;
+  border-radius: 22px;
+  background: var(--deck-paper);
+}
+.deck-card h3 {
+  margin-bottom: 5mm;
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.deck-card-blue {
+  border-color: transparent;
+  background: linear-gradient(170deg, #4336ff, #2f25c9);
+  color: #fff;
+}
+.deck-card-soft {
+  border-color: transparent;
+  background: var(--deck-lavender);
 }
 
-/* Cover */
+/* Cover: a hero card, its copy on the left and the map on the right, as the website's heroes are. */
 .deck-cover {
+  padding-bottom: 17mm;
+}
+.deck-hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
-  gap: 12mm;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--deck-paper);
+}
+.deck-cover-copy {
+  align-self: center;
+  padding: 0 8mm 0 12mm;
+}
+.deck-act {
+  display: flex;
   align-items: center;
-  background: linear-gradient(150deg, #ffffff 0%, #f4f3fd 100%);
+  gap: 4mm;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hl-blue);
 }
 .deck-cover-copy .hl-tile {
-  width: 96px;
-  height: 96px;
-  border-radius: 28px;
-  font-size: 40px;
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+  font-size: 32px;
 }
 .deck-cover-copy h1 {
-  margin-top: 8mm;
-  font-size: 54px;
+  margin-top: 7mm;
+  font-size: 68px;
   line-height: 1;
 }
 .deck-headline {
   margin-top: 5mm !important;
-  font-family: var(--font-display), sans-serif;
-  font-size: 22px;
-  line-height: 1.35 !important;
-  letter-spacing: -0.02em;
-  color: #3a3d55;
+  font-size: 20px;
+  line-height: 1.4 !important;
+  color: var(--hl-ink);
 }
 .deck-facts {
   display: flex;
-  gap: 10mm;
+  gap: 3mm;
   margin-top: 9mm !important;
 }
 .deck-facts li {
-  font-size: 13px;
-  color: var(--hl-muted);
+  flex: 1;
+  padding: 4mm 5mm;
+  border-radius: 16px;
+  background: var(--deck-lavender);
+  font-size: 12px;
+  color: var(--hl-ink);
 }
 .deck-facts b {
   display: block;
   font-family: var(--font-display), sans-serif;
-  font-size: 30px;
+  font-size: 28px;
+  font-weight: 700;
   letter-spacing: -0.04em;
-  color: var(--hl-ink);
+}
+.deck-cover-map {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--deck-lavender);
+  clip-path: polygon(7% 0, 100% 0, 100% 100%, 0 100%);
+}
+.deck-cover-map > * {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
 }
 
 /* Inner pages */
 .deck-cols {
   display: grid;
+  flex: 1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10mm;
-  margin-top: 10mm;
+  gap: 5mm;
+  min-height: 0;
+  margin-top: 8mm;
 }
 .deck-cols-2 {
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.deck-cols-2 > :only-child {
+  grid-column: 1 / -1;
 }
 .deck-cols p {
-  font-size: 15px;
-  color: #3b3e52;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.deck-card-blue .hl-tags {
+  gap: 8px;
+}
+.deck-card-blue .hl-chip {
+  border: 1px solid rgb(255 255 255 / 0.7);
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+}
+.deck .hl-skews {
+  display: grid;
+  gap: 5mm;
+}
+.deck .hl-skew {
+  grid-template-columns: 70px minmax(0, 1fr);
+  white-space: nowrap;
 }
 .deck-loves {
   display: grid;
   gap: 3mm;
 }
 .deck-loves li {
-  padding: 3mm 4mm;
-  border-radius: 12px;
-  background: var(--hl-soft);
+  padding: 3.5mm 4.5mm;
+  border-radius: 14px;
+  background: #fff;
 }
 .deck-loves small {
   display: block;
   font-size: 11px;
-  color: var(--hl-muted);
+  color: #626574;
 }
 .deck-loves b {
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.deck-split {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 5mm;
+  min-height: 0;
+  margin-top: 7mm;
 }
 .deck-route {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4mm 12mm;
-  margin-top: 9mm !important;
+  align-content: space-between;
+  gap: 2mm;
+  padding: 6mm 8mm;
 }
 .deck-route li {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: center;
 }
 .deck-route li > span {
   display: grid;
@@ -188,41 +270,98 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--hl-ink);
+  background: var(--hl-blue);
   color: #fff;
   font-family: var(--font-display), sans-serif;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 .deck-route li > span.lime {
-  background: var(--hl-tint);
-  color: var(--hl-ink);
+  background: var(--deck-lavender);
+  color: var(--hl-blue);
+}
+.deck-route li > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  column-gap: 5mm;
+  align-items: center;
 }
 .deck-route b {
-  display: block;
+  grid-column: 1;
   font-size: 15px;
+  font-weight: 600;
 }
 .deck-route small {
+  grid-column: 1;
+  font-size: 11.5px;
+  color: #626574;
+}
+.deck-route .hl-bar {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+.deck-proof {
+  display: flex;
+  flex-direction: column;
+  gap: 5mm;
+}
+.deck-proof h3 {
+  margin-bottom: 0;
+}
+.deck-proof > div b {
   display: block;
-  font-size: 12px;
-  color: var(--hl-muted);
+  font-family: var(--font-display), sans-serif;
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+.deck-proof > div span {
+  display: block;
+  margin-top: 1mm;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.deck-proof small {
+  margin-top: auto;
+  font-size: 11.5px;
+  line-height: 1.45;
+  opacity: 0.85;
 }
 .deck-brands {
   display: grid;
+  flex: 1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 5mm;
-  margin-top: 9mm;
+  min-height: 0;
+  margin-top: 7mm;
 }
 .deck-brands .hl-sponsor {
-  padding: 16px;
-  gap: 10px;
+  padding: 6mm;
+  gap: 12px;
+  border-color: #e2e2e8;
+  border-radius: 22px;
+  background: var(--deck-paper);
+}
+.deck-brands .hl-sponsor h3 {
+  font-size: 20px;
+  font-weight: 650;
+}
+.deck-card .hl-openers li {
+  background: #fff;
 }
 .deck-close {
-  margin-top: 10mm !important;
+  margin-top: 5mm !important;
+  padding: 7mm 9mm;
+  border-radius: 22px;
+  background: var(--deck-lavender);
   font-family: var(--font-display), sans-serif;
-  font-size: 24px;
-  letter-spacing: -0.02em;
-  color: var(--hl-blue);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15 !important;
+  letter-spacing: -0.04em;
+  color: var(--hl-ink);
 }
 
 @media print {

@@ -169,7 +169,12 @@ export function TourView({
     setDeck({ busy: true });
     try {
       const res = await fetch(`/api/tour/plan/${plan.id}/pdf`);
-      if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "The deck couldn't be made. Please try again.");
+      if (!res.ok) {
+        const failed = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+        // A server without a browser can't make the PDF: the deck opens in the print dialog, which saves one.
+        if (failed.code === "no_browser") return router.push(`/deck/${plan.id}?print=1`);
+        throw new Error(failed.error ?? "The deck couldn't be made. Please try again.");
+      }
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
