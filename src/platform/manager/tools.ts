@@ -102,6 +102,7 @@ function routeOverview(desk: Desk, agent: Specialist) {
         startsFrom: name(p.request.homeCityId) ?? "wherever makes the shortest tour",
         km: p.route.reduce((s, r) => s + r.legKm, 0),
         flights: p.route.filter((r) => r.mode === "fly").length,
+        distances: "straight-line estimates, not road routes; drive or fly is a likely guess from the distance and borders",
         againstTheBiggestCities: p.proof && { routeFanHeat: p.proof.route, biggestCitiesFanHeat: p.proof.biggest, biggestCities: p.proof.biggestCities },
         stops: p.route.map((r, i) => {
           const c = route.find((x) => x.id === r.cityId)!;

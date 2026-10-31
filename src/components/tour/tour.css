@@ -1414,3 +1414,10 @@
   padding: 0;
   border-radius: 50%;
 }
+
+/* A change card made for an earlier version of the tour, in place of Apply. */
+.hl-team-card-note {
+  flex-shrink: 0;
+  color: var(--hl-subtle);
+  font-size: 12px;
+}

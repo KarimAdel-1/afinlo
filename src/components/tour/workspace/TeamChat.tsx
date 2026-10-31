@@ -113,9 +113,17 @@ export function TeamChat({ plan, actions, onTrack }: { plan: Plan; actions: Tour
             <b>A change to the tour</b>
             <small>{c.summary}</small>
           </span>
-          <button type="button" className="hl-button hl-button-small" onClick={() => actions.rerun(c.request)}>
-            Apply
-          </button>
+          {/* A change made for an earlier version would bring that version's choices back over this one's: it's shown,
+              not applied. Ask again to have it made for this version. */}
+          {c.request.parentId === plan.id ? (
+            <button type="button" className="hl-button hl-button-small" onClick={() => actions.rerun(c.request)}>
+              Apply
+            </button>
+          ) : (
+            <small className="hl-team-card-note" title="The tour has changed since. Ask again to have this change made for the version you're looking at.">
+              Made for an earlier version
+            </small>
+          )}
         </div>
       );
     if (c.kind === "draft")

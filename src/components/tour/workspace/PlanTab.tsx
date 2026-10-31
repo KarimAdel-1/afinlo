@@ -81,7 +81,10 @@ export function PlanTab({
       <section aria-labelledby="hl-route-title">
         <div className="hl-section-head">
           <h2 id="hl-route-title">The route</h2>
-          <p>In order, keeping travel short. Each bar is the city&apos;s Fan Heat; green marks a hidden market. Hover a stop to find it on the map.</p>
+          <p>
+            In order, keeping travel short. Each bar is the city&apos;s Fan Heat; lavender marks a hidden market. Distances are straight-line estimates, not road routes. Hover a stop to find it
+            on the map.
+          </p>
         </div>
         {plan.route.length ? (
           <ol className="hl-stops">
@@ -92,9 +95,9 @@ export function PlanTab({
               return (
                 <li key={r.cityId} className={active === c.id ? "on" : ""} onMouseEnter={() => onActive(c.id)} onMouseLeave={() => onActive(undefined)}>
                   {!!r.legKm && (
-                    <div className="hl-leg">
-                      {r.mode === "fly" ? <Plane size={14} aria-hidden /> : <Car size={14} aria-hidden />}
-                      {r.legKm.toLocaleString("en-US")} km {r.mode === "fly" ? "flight" : "drive"}
+                    // An estimate: the straight-line distance, and the way it would likely be travelled, not a road route.
+                    <div className="hl-leg" title="Straight-line distance; the mode is a likely guess from the distance and the border, not a booked route.">
+                      {r.mode === "fly" ? <Plane size={14} aria-hidden /> : <Car size={14} aria-hidden />}≈{r.legKm.toLocaleString("en-US")} km, likely a {r.mode === "fly" ? "flight" : "drive"}
                       {i === 0 && plan.request.homeCityId ? " from home" : ""}
                     </div>
                   )}

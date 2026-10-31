@@ -194,8 +194,12 @@ export function TourView({
               <h1>{plan.act.name}</h1>
               <p>
                 {plan.route.length}-stop tour{plan.area ? ` of ${plan.area}` : ""}
-                {totalKm ? ` · ${totalKm.toLocaleString("en-US")} km` : ""}
-                {flights ? ` · ${flights} ${flights === 1 ? "flight" : "flights"}` : ""}
+                {totalKm ? (
+                  <span title="Straight-line distances between the stops: an estimate, not a road route">{` · ≈${totalKm.toLocaleString("en-US")} km`}</span>
+                ) : (
+                  ""
+                )}
+                {flights ? ` · likely ${flights} ${flights === 1 ? "flight" : "flights"}` : ""}
               </p>
             </div>
           </div>
