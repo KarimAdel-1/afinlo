@@ -9,7 +9,7 @@
 
 Afinlo is an AI tour manager that knows your fans. Tell it which artist or comedian is touring and where, anywhere in the world. It plans the tour from Qloo's taste data, finds the venues and the sponsors, drafts the emails, and keeps track of every follow-up. Inside each tour, a team of AI agents answers questions about it, proposes changes and drafts the outreach. Qloo supplies every city, venue, brand and act, and plain code scores them and plans the route. The agents explain, propose and write from those results only.
 
-- **Live demo:** _add the public URL here when it's deployed_ · no sign-up
+- **Live demo:** [afinlo-psi.vercel.app](https://afinlo-psi.vercel.app) · no sign-up
 - **Try first:** the example tours on Home: *Khruangbin* in Europe, *Bad Bunny* in Latin America, *Wegz* in the Middle East and North Africa, *Morgan Wallen* and *Taylor Tomlinson* in North America, *Glass Beams* in Australia and the Pacific. Then plan one for an act you know.
 - Built for the [Qloo Agentic Hackathon](https://qloo.devpost.com) · Apache 2.0
 
