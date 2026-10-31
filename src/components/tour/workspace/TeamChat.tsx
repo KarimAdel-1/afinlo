@@ -93,7 +93,11 @@ export function TeamChat({ plan, actions, onTrack }: { plan: Plan; actions: Tour
       setMessages((v) => [...v, { role: "assistant", text: answer.reply, agents: answer.agents, cards: answer.cards }]);
       if (!openNow.current) setUnread(true);
     } catch (e) {
-      setError((e as Error).message);
+      // What the team saved before the reply failed is applied and shown with the error, so the page matches the tour.
+      const cards = (e as { cards?: ManagerCard[] }).cards ?? [];
+      for (const card of cards) if (card.kind === "status") onTrack(card.track);
+      if (cards.length) setMessages((v) => [...v, { role: "assistant", text: (e as Error).message, cards }]);
+      else setError((e as Error).message);
       if (!openNow.current) setUnread(true);
     } finally {
       setSteps(undefined);

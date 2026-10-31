@@ -70,9 +70,10 @@ export async function streamChat(planId: string, message: string, onEvent: (e: M
     const lines = buffer.split("\n");
     buffer = done ? "" : lines.pop()!;
     for (const line of lines.filter(Boolean)) {
-      const event = JSON.parse(line) as { event?: ManagerEvent; reply?: { reply: string; agents: Specialist[]; cards: ManagerCard[] }; error?: string };
+      const event = JSON.parse(line) as { event?: ManagerEvent; reply?: { reply: string; agents: Specialist[]; cards: ManagerCard[] }; error?: string; cards?: ManagerCard[] };
       if (event.event) onEvent(event.event);
-      if (event.error) throw new Error(event.error);
+      // A reply that didn't finish still brings what the team saved before it stopped.
+      if (event.error) throw Object.assign(new Error(event.error), { cards: event.cards ?? [] });
       if (event.reply) return event.reply;
     }
     if (done) throw new Error("The connection closed before the team answered. Please try again.");

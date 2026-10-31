@@ -14,7 +14,7 @@ import { calls, ScriptedModel } from "@/testing/scripted";
 import { planTour } from "../tour/agent";
 import { actMemory, tracksFor } from "../tour/tracker";
 import { templatePitch } from "../tour/writer";
-import { askManager, managerHistory } from "./chat";
+import { askManager, managerHistory, TurnFailed } from "./chat";
 import { LIMITS, type Role } from "./graph";
 import { TOOL_BUDGET } from "./tools";
 
@@ -104,6 +104,18 @@ test("a change is only a proposal: the route planner builds the next request, an
   assert.ok(added?.kind === "change");
   assert.equal(added.summary, `add Testville (${stop.name} makes way: shows stay 150 km apart)`);
   assert.deepEqual(added.request.includeCityIds, ["us-testville"]);
+
+  // A compound change to another area keeps every part of it, resolved in the new area, and what isn't supported yet
+  // is said, not implied.
+  const moved = await ask(plan, "Move this to Europe, start in Berlin, keep six shows, and avoid flights.", {
+    manager: new ScriptedModel([calls(["ask_route_planner", { task: "Move the tour to Europe, start in Berlin, play Berlin, 6 shows, no flights." }])]),
+    route: new ScriptedModel([calls(["propose_change", { area: "Europe", add: ["Berlin"], startFrom: "Berlin", shows: 6, notSupported: ["no flights"] }]), "Proposed: Europe from Berlin."]),
+  });
+  const europe = moved.cards[0];
+  assert.ok(europe?.kind === "change");
+  assert.deepEqual(europe.request.where, { kind: "region", region: "europe" });
+  assert.deepEqual([europe.request.stops, europe.request.homeCityId, europe.request.includeCityIds], [6, "de-berlin", ["de-berlin"]]);
+  assert.equal(europe.summary, "tour Europe instead · 6 shows · add Berlin · start from Berlin (not supported yet, so not applied: no flights)");
 });
 
 test("a message that needs two specialists goes to both at once, and the reply is both answers", async () => {
@@ -287,4 +299,21 @@ test("earlier turns reach the model as what was said, a specialist's answer is t
   assert.match(history[1].text, /left out a figure/);
   assert.doesNotMatch(history[1].text, /Nike/);
   assert.equal(manager.left + route.left, 0);
+});
+
+test("a reply that fails after something was saved says what was saved, rather than that nothing changed", async () => {
+  const plan = await tour();
+  const browser = testBrowser();
+  const manager = new ScriptedModel([
+    calls(["remember_no", { kind: "category", name: "alcohol" }]),
+    () => {
+      throw new Error("The model is down.");
+    },
+  ]);
+  await assert.rejects(ask(plan, "Never alcohol.", { manager }, { browser }), (e: unknown) => {
+    assert.ok(e instanceof TurnFailed);
+    assert.deepEqual(e.made.map((c) => c.kind), ["memory"]);
+    return true;
+  });
+  assert.deepEqual((await actMemory(browser, plan.act.id))?.avoid, ["alcohol"], "and it is saved");
 });

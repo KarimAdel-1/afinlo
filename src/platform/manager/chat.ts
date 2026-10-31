@@ -46,6 +46,19 @@ const threadOf = (plan: Pick<Plan, "id" | "rootId">, browser: string) => `tour:$
 /** The specialists asked in these messages (a handoff past the limit, marked as an error, wasn't). */
 const agentsIn = (messages: BaseMessage[]) => [...new Set(messages.flatMap((m) => (isToolMessage(m) && m.status !== "error" && agentOf(m.name ?? "") ? [agentOf(m.name ?? "")!] : [])))];
 
+/**
+ * A message whose reply didn't finish (the model failed, the time ran out), with what the team had already made: its
+ * statuses and "no"s are saved as they're made, so the user is told they stand rather than that nothing changed.
+ */
+export class TurnFailed extends Error {
+  constructor(
+    readonly cause: unknown,
+    readonly made: ManagerCard[],
+  ) {
+    super(cause instanceof Error ? cause.message : "The turn failed.");
+  }
+}
+
 /** One message to the tour's manager: the reply, the specialists it asked, and what they made for the user. */
 export async function askManager(
   input: { plan: Plan; browser: string; message: string; signal: AbortSignal; emit?: (event: ManagerEvent) => void },
@@ -65,6 +78,8 @@ export async function askManager(
     );
     const turn = thisTurn(out.messages);
     return { reply: textOf(turn.at(-1)), agents: agentsIn(turn), cards: desk.made.map((m) => m.card) };
+  } catch (error) {
+    throw new TurnFailed(error, desk.made.map((m) => m.card));
   } finally {
     await meter.save();
   }

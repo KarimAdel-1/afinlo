@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { TourError, type ManagerEvent } from "@/core/tour/types";
+import { TourError, type ManagerCard, type ManagerEvent } from "@/core/tour/types";
 import { setting } from "@/lib/settings";
-import { askManager, managerHistory } from "@/platform/manager/chat";
+import { askManager, managerHistory, TurnFailed } from "@/platform/manager/chat";
 import { bodyOf, browserOf, errorResponse, forbidden, fromOurPages, knownBrowser, NO_STORE, visitorOf } from "@/platform/tour/http";
 import { claimChatSlot, getPlan } from "@/platform/tour/store";
 
@@ -49,14 +49,20 @@ export async function POST(request: Request, { params }: RouteContext<"/api/tour
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(60_000)]);
   const body = new ReadableStream({
     async start(controller) {
-      const send = (line: { event?: ManagerEvent; reply?: unknown; error?: string }) => controller.enqueue(encoder.encode(JSON.stringify(line) + "\n"));
+      const send = (line: { event?: ManagerEvent; reply?: unknown; error?: string; cards?: ManagerCard[] }) => controller.enqueue(encoder.encode(JSON.stringify(line) + "\n"));
       try {
         const answer = await askManager({ plan, browser, message, signal, emit: (event) => send({ event }) });
         send({ reply: answer });
       } catch (error) {
-        const e = error instanceof TourError ? error : undefined;
-        if (!e && !signal.aborted) console.error("The tour manager failed:", error);
-        send({ error: e?.message ?? (signal.aborted ? "That took longer than a minute, so it was stopped. Try a shorter question." : "The team couldn't answer that. Nothing was changed; please try again.") });
+        // What the team saved before the reply failed stays saved, and the user is told so, with it shown.
+        const made = error instanceof TurnFailed ? error.made : [];
+        const cause = error instanceof TurnFailed ? error.cause : error;
+        const e = cause instanceof TourError ? cause : undefined;
+        if (!e && !signal.aborted) console.error("The tour manager failed:", cause);
+        const why = e?.message ?? (signal.aborted ? "That took longer than a minute, so it was stopped." : "The team couldn't finish its reply.");
+        const saved = made.filter((c) => c.kind === "status" || c.kind === "memory" || c.kind === "draft");
+        const kept = saved.length ? ` What it saved before stopping stays saved: ${saved.map((c) => (c.kind === "draft" ? `a draft for ${c.draft.to}` : c.text)).join("; ")}.` : " Nothing was saved this time.";
+        send({ error: `${why}${kept} Please try again.`, ...(made.length ? { cards: made } : {}) });
       } finally {
         controller.close();
       }

@@ -2,7 +2,7 @@
 // it over-indexes (heatmap), and find brands, support acts and local spots. Every result keeps its Qloo ID. Calls go
 // through the shared client (timeouts, bounded retries, traces) and the 24-hour cache.
 import { z } from "zod";
-import type { TasteTrace } from "@/core/taste/types";
+import { TasteError, type TasteTrace } from "@/core/taste/types";
 import type { Act, CityPlace, PlanEntity } from "@/core/tour/types";
 import type { BrandResult, HeatCell } from "@/core/tour/scoring";
 import { QlooClient, safeImage, website } from "../taste/qloo";
@@ -49,9 +49,26 @@ export function planEntity(v: unknown): PlanEntity | undefined {
   };
 }
 
-const entities = (body: unknown) => {
+/**
+ * A response that isn't the shape Qloo documents: an error, with its trace marked failed, so a broken answer is never
+ * read as a valid empty one ("this act has no data") and sent down a fallback.
+ */
+function broken(traces: TasteTrace[], start: number, what: string): never {
+  if (traces[start]) {
+    traces[start].status = "error";
+    traces[start].error = `Unexpected ${what} response.`;
+  }
+  throw new TasteError("qloo_contract", `Qloo returned an unexpected ${what} response, so this part couldn't be read. Try again shortly.`, 502);
+}
+/** A response's entities: a list, empty when Qloo found none; an error when the response isn't a list at all. */
+const entities = (body: unknown, traces?: TasteTrace[], start = 0) => {
   const results = record(body).results;
-  return list(Array.isArray(results) ? results : record(results).entities);
+  const found = Array.isArray(results) ? results : record(results).entities;
+  if (!Array.isArray(found)) {
+    if (traces) broken(traces, start, "entity");
+    return [];
+  }
+  return found;
 };
 const COMEDY = /\b(comedian|comedy|stand-?up|comic)\b/i;
 function toAct(v: unknown, kind?: Act["kind"]): Act | undefined {
@@ -101,7 +118,10 @@ export async function heatCells(client: QlooClient, ids: string[], traces: Taste
   const start = traces.length;
   const area: Record<string, string> = location ? { "filter.location": location } : { "filter.location.query": "United States" };
   const body = await client.request("qloo_heatmap", "/v2/insights", { "filter.type": "urn:heatmap", "signal.interests.entities": ids.join(","), ...area, take: "10" }, traces, signal);
-  const cells = list(record(record(body).results).heatmap).flatMap((c) => {
+  // An empty heatmap is a valid answer (no data there); a missing one, or cells none of which can be read, is not.
+  const heatmap = record(record(body).results).heatmap;
+  if (!Array.isArray(heatmap)) broken(traces, start, "heatmap");
+  const cells = heatmap.flatMap((c) => {
     const loc = record(record(c).location),
       q = record(record(c).query);
     const lat = num(loc.latitude),
@@ -109,6 +129,7 @@ export async function heatCells(client: QlooClient, ids: string[], traces: Taste
       affinity = num(q.affinity);
     return lat !== undefined && lon !== undefined && affinity !== undefined ? [{ lat, lon, affinity }] : [];
   });
+  if (heatmap.length && !cells.length) broken(traces, start, "heatmap");
   traces[start].count = cells.length;
   return cells;
 }
@@ -116,7 +137,7 @@ export async function heatCells(client: QlooClient, ids: string[], traces: Taste
 const insightEntities = async (client: QlooClient, params: Record<string, string>, traces: TasteTrace[], signal?: AbortSignal) => {
   const start = traces.length;
   const body = await client.request("qloo_recommend", "/v2/insights", params, traces, signal);
-  const out = entities(body);
+  const out = entities(body, traces, start);
   traces[start].count = out.length;
   return out;
 };

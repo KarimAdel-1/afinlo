@@ -5,7 +5,7 @@
 import { compactResult } from "@/core/tour/compact";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
-import { COUNTRY_NAMES, placeOf, REGIONS, where as whereSchema, whereLabel, type Where } from "@/core/tour/regions";
+import { COUNTRY_NAMES, placeOf, REGIONS, US, where as whereSchema, whereLabel, type Where } from "@/core/tour/regions";
 import { signalIdsOf } from "@/core/tour/named";
 import { km, routeRules, scoreSponsors, strongestIn } from "@/core/tour/scoring";
 import {
@@ -26,11 +26,12 @@ import {
   type VenueStatus,
 } from "@/core/tour/types";
 import { whyCity } from "@/core/tour/why";
-import { locationOf } from "@/core/tour/world";
+import { citiesIn, locationOf } from "@/core/tour/world";
 import { brands as qlooBrands, heatCells } from "../tour/qloo";
 import { data } from "../tour/model";
 import { rememberAct, setTrack } from "../tour/tracker";
 import { unsupportedClaim } from "@/core/tour/claims";
+import { matchCity } from "../tour/writer";
 import { areaCityNamed, brandNamed, cardId, cityNamed, guideFor, named, routeOf, type Desk } from "./desk";
 
 /** How many tool calls the whole team may make for one message. */
@@ -235,29 +236,39 @@ function routeTools(desk: Desk): Tool[] {
         startFrom: z.string().max(80).optional().describe('A city in the area to start from, or "anywhere".'),
         focus: z.enum(["balanced", "hidden"]).optional().describe('"hidden" puts hidden markets first.'),
         area: z.string().max(120).optional().describe('Another area: a region ("Europe"), countries ("Germany and Austria"), or "the world" for a world tour.'),
+        notSupported: z
+          .array(z.string().max(80))
+          .max(4)
+          .optional()
+          .describe('Anything else asked for that these fields can\'t express, in a few words each ("no flights", "weekends only", "a budget"): reported to the user as not supported yet, never implied.'),
       }),
       label: () => "Drafting a change to the route",
       run: (c) => {
         const r = p.request;
         const area = c.area ? areaNamed(c.area) : undefined;
         if (c.area && !area) throw new TourError("area", `"${c.area}" isn't an area Afinlo tours. Name a region (${REGIONS.map((x) => x.label).join(", ")}) or countries.`);
-        const resolve = (names: string[] | undefined, within: "plan" | "area") =>
+        // The area first, then every city in it: with a new area, the cities to add, skip and start from are that
+        // area's, so "move to Europe, start in Berlin" keeps Berlin rather than dropping it.
+        const where = area ?? r.where ?? US;
+        const inArea = citiesIn(where).map((x) => ({ ...x, state: x.admin1 }));
+        const areaCity = (n: string) => inArea.find((x) => x.id === n.trim().toLowerCase() || x.id === matchCity(n, inArea));
+        const resolve = (names: string[] | undefined) =>
           (names ?? []).map((n) => {
-            const found = within === "plan" ? (cityNamed(p, n) ?? areaCityNamed(p, n)) : areaCityNamed(p, n);
-            if (!found) throw new TourError("city", `${n} isn't a candidate city in ${p.area ?? "the tour's area"}.`);
+            const found = (area ? undefined : cityNamed(p, n)) ?? areaCity(n);
+            if (!found) throw new TourError("city", `${n} isn't a candidate city in ${area ? whereLabel(area) : (p.area ?? "the tour's area")}.`);
             return found;
           });
-        const skip = area ? [] : resolve(c.skip, "plan");
-        const add = area ? [] : resolve(c.add, "plan");
-        const start = c.startFrom && !/^any/i.test(c.startFrom.trim()) && !area ? resolve([c.startFrom], "area")[0] : undefined;
+        const skip = resolve(c.skip);
+        const add = resolve(c.add);
+        const start = c.startFrom && !/^any/i.test(c.startFrom.trim()) ? resolve([c.startFrom])[0] : undefined;
         const ids = (list: { id: string }[]) => list.map((x) => x.id);
         const next: PlanRequest & { parentId: string } = {
           ...r,
           ...(c.shows ? { stops: c.shows } : {}),
           ...(c.focus ? { focus: c.focus } : {}),
-          // A new area starts afresh: the old area's cities don't apply there.
+          // A new area keeps none of the old area's cities, only those asked for in it now.
           ...(area
-            ? { where: area, excludeCityIds: [], includeCityIds: undefined, homeCityId: undefined }
+            ? { where: area, excludeCityIds: ids(skip), includeCityIds: add.length ? ids(add) : undefined, homeCityId: start?.id }
             : {
                 excludeCityIds: [...new Set([...r.excludeCityIds.filter((id) => !ids(add).includes(id)), ...ids(skip)])],
                 includeCityIds: [...new Set([...(r.includeCityIds ?? []).filter((id) => !ids(skip).includes(id)), ...ids(add)])],
@@ -266,20 +277,23 @@ function routeTools(desk: Desk): Tool[] {
           parentId: p.id,
         };
         if (!planInput.safeParse(next).success) throw new TourError("change", "That change doesn't make a valid tour. Try fewer cities.");
-        // A city added next to a stop takes that stop's place: shows stay a set distance apart.
-        const gap = routeRules(p.request.where, next.stops).gapKm;
-        const displaced = routeOf(p).filter((s) => !ids(skip).includes(s.id) && !ids(add).includes(s.id) && add.some((a) => km(a, s) < gap));
+        // A city added next to a stop takes that stop's place: shows stay a set distance apart. (A new area has no
+        // stops yet to make way.)
+        const gap = routeRules(next.where, next.stops).gapKm;
+        const displaced = area ? [] : routeOf(p).filter((s) => !ids(skip).includes(s.id) && !ids(add).includes(s.id) && add.some((a) => km(a, s) < gap));
+        const unsupported = (c.notSupported ?? []).map((x) => x.trim()).filter(Boolean);
         const summary = [
+          area && `tour ${whereLabel(area)} instead`,
           c.shows && c.shows !== r.stops && `${c.shows} shows`,
           skip.length && `skip ${skip.map((x) => x.name).join(", ")}`,
           add.length && `add ${add.map((x) => x.name).join(", ")}${displaced.length ? ` (${displaced.map((x) => x.name).join(", ")} makes way: shows stay ${gap} km apart)` : ""}`,
-          c.startFrom && (start ? `start in ${start.name}` : "start wherever is shortest"),
+          c.startFrom && (start ? `start from ${start.name}` : "start wherever is shortest"),
           c.focus && c.focus !== r.focus && (c.focus === "hidden" ? "hidden markets first" : "the strongest cities first"),
-          area && `tour ${whereLabel(area)} instead`,
         ].filter(Boolean);
-        if (!summary.length) return "That's how the tour already is: nothing to change.";
-        keep(desk, "route", { id: cardId(), kind: "change", summary: summary.join(" · "), request: next });
-        return `Proposed: ${summary.join("; ")}. The user applies it from the chat; nothing has changed yet. A city added must have Qloo data to be routed.`;
+        if (!summary.length) return unsupported.length ? `Afinlo can't plan around ${unsupported.join(", ")} yet, so there's nothing to change. Say so plainly.` : "That's how the tour already is: nothing to change.";
+        const notYet = unsupported.length ? ` (not supported yet, so not applied: ${unsupported.join(", ")})` : "";
+        keep(desk, "route", { id: cardId(), kind: "change", summary: `${summary.join(" · ")}${notYet}`, request: next });
+        return `Proposed: ${summary.join("; ")}.${unsupported.length ? ` Not supported yet, and not part of the change: ${unsupported.join(", ")}. Say so plainly.` : ""} Starting from a city means leaving from it, not playing it, unless it's added too. The user applies it from the chat; nothing has changed yet. A city added must have Qloo data to be routed.`;
       },
     }),
   ];
