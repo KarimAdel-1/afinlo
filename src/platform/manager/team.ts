@@ -55,6 +55,9 @@ export function managerPrompt(plan: Plan, summary: string) {
     stops: routeOf(plan).map((c) => `${c.name} (Fan Heat ${c.heat}${c.hidden ? ", hidden market" : ""})`),
     sponsors: plan.sponsors.slice(0, 6).map((s) => s.brand.name),
     fansFrom: plan.signal.basis === "act" ? "the act's own Qloo data" : `${plan.signal.basis === "named" ? "predicted from" : "estimated from"} ${plan.signal.similar.map((s) => s.name).join(", ")}`,
+    // Sections that leaned on acts like it, though the map didn't.
+    ...(plan.signal.basis === "act" && plan.provenance?.sponsors === "similar" ? { sponsorsFrom: "the act's fans together with similar acts' (few brand matches for the act alone)" } : {}),
+    ...(plan.signal.basis === "act" && plan.provenance?.audience === "similar" ? { audienceFrom: "partly the act's fans together with similar acts'" } : {}),
   };
   return [
     `You are the tour manager on Afinlo's tour team, talking with the user about ${tourLine(plan)}. Your specialists do the work, each with its own tools on the tour's Qloo data: ${(Object.keys(TEAM) as Specialist[]).map((a) => TEAM[a].does).join(" ")}`,

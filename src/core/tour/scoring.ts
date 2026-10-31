@@ -240,8 +240,9 @@ function orderStops(cities: CityHeat[], options: RouteOptions): RouteStop[] {
   );
   // No two stops in one market: a city near a stronger stop is left out, as promoters' radius clauses would.
   const apart = (c: CityHeat, others: CityHeat[]) => others.every((o) => o === c || km(o, c) >= gap);
-  // The cities asked for come first, whatever their score; then the act's hottest market, unless one asked for is in it.
-  const asked = (options.includeCityIds ?? []).flatMap((id) => pool.find((c) => c.id === id) ?? []);
+  // The cities asked for come first, whatever their score, each once; then the act's hottest market, unless one asked
+  // for is in it. (What couldn't be honoured is reported by requestedCheck.)
+  const asked = [...new Set(options.includeCityIds ?? [])].flatMap((id) => pool.find((c) => c.id === id) ?? []);
   const anchor = hottestMarket(pool, gap);
   const must = [...asked, ...(anchor && !asked.includes(anchor) && apart(anchor, asked) ? [anchor] : [])].slice(0, options.stops);
   const chosen: CityHeat[] = [...must];
@@ -282,6 +283,22 @@ function orderStops(cities: CityHeat[], options: RouteOptions): RouteStop[] {
     });
   if (home) return legs(sweep(home));
   return chosen.map((c) => legs(sweep(c))).reduce((best, r) => (routeKm(r) < routeKm(best) ? r : best));
+}
+
+/**
+ * How the cities asked for by name fared: those with no Qloo data for the act (or left out by the user), those that
+ * didn't fit in the shows, and pairs closer than the usual spacing, kept because they were asked for. So a plan never
+ * drops a requirement without saying so.
+ */
+export function requestedCheck(cities: CityHeat[], route: RouteStop[], options: Pick<RouteOptions, "includeCityIds" | "excludeCityIds" | "gapKm">) {
+  const asked = [...new Set(options.includeCityIds ?? [])];
+  const gap = options.gapKm ?? MIN_GAP_KM;
+  const onRoute = new Set(route.map((r) => r.cityId));
+  const known = (id: string) => cities.some((c) => c.id === id) && !options.excludeCityIds?.includes(id);
+  const kept = asked.filter((id) => onRoute.has(id)).map((id) => cities.find((c) => c.id === id)!);
+  const close: [CityHeat, CityHeat, number][] = [];
+  for (let i = 0; i < kept.length; i++) for (let j = i + 1; j < kept.length; j++) if (km(kept[i], kept[j]) < gap) close.push([kept[i], kept[j], Math.round(km(kept[i], kept[j]))]);
+  return { noData: asked.filter((id) => !known(id)), cut: asked.filter((id) => known(id) && !onRoute.has(id)), close, gap };
 }
 
 /** 2-opt: reverses any stretch of the route that makes it cross itself, until none does. The start stays put. */

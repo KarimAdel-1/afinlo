@@ -226,21 +226,45 @@
   margin: 0 auto;
   padding-top: 84px;
 }
-.hl-assist::before {
-  content: "";
-  position: absolute;
-  inset: -40px -18% 0;
-  z-index: -1;
-  background:
-    radial-gradient(42% 38% at 85% 18%, rgb(143 134 255 / 0.22), transparent 70%),
-    radial-gradient(38% 34% at 10% 78%, rgb(224 221 250 / 0.6), transparent 70%),
-    radial-gradient(30% 30% at 55% 40%, rgb(255 255 255 / 0.55), transparent 70%);
-  filter: blur(8px);
-  pointer-events: none;
-}
 .hl-assist.fresh {
   min-height: calc(100dvh - 120px);
   justify-content: center;
+}
+/*
+ * A conversation, as in a chat app: the messages fill the page from the top, and the box stays at the bottom of the
+ * screen, on the page's own colour, however far the messages scroll. The greeting gives way to them.
+ */
+.hl-home:has(.hl-assist:not(.fresh)) {
+  padding-bottom: 0;
+}
+.hl-assist:not(.fresh) {
+  min-height: calc(100dvh - 28px);
+  padding-bottom: 0;
+}
+.hl-assist:not(.fresh) .hl-assist-hero {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.hl-assist:not(.fresh) .hl-assist-log {
+  flex: 1;
+}
+.hl-assist:not(.fresh) .hl-assist-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  padding: 12px 0 16px;
+  background: #f6f6f9;
+}
+.hl-assist:not(.fresh) .hl-assist-box-top {
+  display: none;
+}
+/* The newest message is scrolled to above the box, not under it. */
+.hl-assist-end {
+  scroll-margin-bottom: 220px;
 }
 /* In the page's top corners, clear of the chat: History (the browser's chats, newest first) and New chat. */
 .hl-home {
@@ -646,6 +670,19 @@
 @media (max-width: 700px) {
   .hl-assist {
     padding-top: 68px;
+  }
+  .hl-assist:not(.fresh) {
+    min-height: calc(100dvh - 16px);
+  }
+  .hl-assist:not(.fresh) .hl-assist-dock {
+    padding: 8px 0 10px;
+  }
+  /* On a phone the box in a conversation is just the message and send: the shortcuts are for starting out. */
+  .hl-assist:not(.fresh) .hl-assist-actions {
+    display: none;
+  }
+  .hl-assist-end {
+    scroll-margin-bottom: 140px;
   }
   .hl-assist-bar {
     top: 14px;

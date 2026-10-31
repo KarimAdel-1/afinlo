@@ -523,107 +523,110 @@ export function AssistantChat({
                 {error}
               </p>
             )}
-            <div ref={end} />
+            <div ref={end} className="hl-assist-end" />
           </div>
         )}
 
-        <form
-          className="hl-assist-box"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send(text);
-          }}
-        >
-          <div className="hl-assist-box-top">
-            <span>
-              Powered by Qloo&apos;s taste data: where an act&apos;s fans really
-              are
-            </span>
-            <Link href="/plan" className="hl-assist-box-link">
-              Prefer a form? <ArrowRight size={14} aria-hidden />
-            </Link>
-          </div>
-          <div className="hl-assist-box-main">
-            <div className="hl-assist-input">
-              <label htmlFor="hl-assist-input" className="hl-visually-hidden">
-                A message to Afinlo
-              </label>
-              <textarea
-                ref={input}
-                id="hl-assist-input"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send(text);
-                  }
-                }}
-                placeholder={
-                  state.status === "off"
-                    ? "The assistant isn't available"
-                    : listening
-                      ? "Listening…"
-                      : "Tell me about your act, or ask for a tour…"
-                }
-                rows={fresh ? 3 : 2}
-                maxLength={1000}
-                disabled={!ready || !!steps}
-                autoFocus
-              />
+        {/* In a conversation, the box stays at the bottom of the screen with the messages above it, as in a chat app. */}
+        <div className="hl-assist-dock">
+          <form
+            className="hl-assist-box"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send(text);
+            }}
+          >
+            <div className="hl-assist-box-top">
+              <span>
+                Powered by Qloo&apos;s taste data: where an act&apos;s fans
+                really are
+              </span>
+              <Link href="/plan" className="hl-assist-box-link">
+                Prefer a form? <ArrowRight size={14} aria-hidden />
+              </Link>
             </div>
-            <div className="hl-assist-box-foot">
-              <div className="hl-assist-actions">
-                {actions.map((a) => {
-                  const Icon = a.icon;
-                  return (
-                    <button
-                      key={a.label}
-                      type="button"
-                      disabled={!ready || !!steps}
-                      onClick={() => void send(a.say)}
-                    >
-                      <Icon size={16} aria-hidden /> {a.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="hl-assist-send">
-                {canDictate && (
-                  <button
-                    type="button"
-                    className={`hl-assist-mic${listening ? " on" : ""}`}
-                    disabled={!ready || !!steps}
-                    onClick={dictate}
-                    aria-pressed={listening}
-                    aria-label={
-                      listening ? "Stop dictating" : "Dictate a message"
+            <div className="hl-assist-box-main">
+              <div className="hl-assist-input">
+                <label htmlFor="hl-assist-input" className="hl-visually-hidden">
+                  A message to Afinlo
+                </label>
+                <textarea
+                  ref={input}
+                  id="hl-assist-input"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send(text);
                     }
-                    title={listening ? "Stop dictating" : "Dictate a message"}
+                  }}
+                  placeholder={
+                    state.status === "off"
+                      ? "The assistant isn't available"
+                      : listening
+                        ? "Listening…"
+                        : "Tell me about your act, or ask for a tour…"
+                  }
+                  rows={fresh ? 3 : 2}
+                  maxLength={1000}
+                  disabled={!ready || !!steps}
+                  autoFocus
+                />
+              </div>
+              <div className="hl-assist-box-foot">
+                <div className="hl-assist-actions">
+                  {actions.map((a) => {
+                    const Icon = a.icon;
+                    return (
+                      <button
+                        key={a.label}
+                        type="button"
+                        disabled={!ready || !!steps}
+                        onClick={() => void send(a.say)}
+                      >
+                        <Icon size={16} aria-hidden /> {a.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="hl-assist-send">
+                  {canDictate && (
+                    <button
+                      type="button"
+                      className={`hl-assist-mic${listening ? " on" : ""}`}
+                      disabled={!ready || !!steps}
+                      onClick={dictate}
+                      aria-pressed={listening}
+                      aria-label={
+                        listening ? "Stop dictating" : "Dictate a message"
+                      }
+                      title={listening ? "Stop dictating" : "Dictate a message"}
+                    >
+                      {listening ? (
+                        <MicOff size={18} aria-hidden />
+                      ) : (
+                        <Mic size={18} aria-hidden />
+                      )}
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="hl-assist-go"
+                    disabled={!ready || !!steps || !text.trim()}
+                    aria-label="Send"
                   >
-                    {listening ? (
-                      <MicOff size={18} aria-hidden />
+                    {steps ? (
+                      <LoaderCircle size={18} className="hl-spin" aria-hidden />
                     ) : (
-                      <Mic size={18} aria-hidden />
+                      <ArrowUp size={20} aria-hidden />
                     )}
                   </button>
-                )}
-                <button
-                  type="submit"
-                  className="hl-assist-go"
-                  disabled={!ready || !!steps || !text.trim()}
-                  aria-label="Send"
-                >
-                  {steps ? (
-                    <LoaderCircle size={18} className="hl-spin" aria-hidden />
-                  ) : (
-                    <ArrowUp size={20} aria-hidden />
-                  )}
-                </button>
+                </div>
               </div>
             </div>
-          </div>
-        </form>
+          </form>
+        </div>
 
         {fresh && (
           <ul className="hl-assist-topics" aria-label="Ask about">

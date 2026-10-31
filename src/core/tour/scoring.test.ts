@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COUNTRY_NAMES, REGIONS, US } from "./regions";
-import { cityAffinity, CITY_RADIUS_KM, DRIVE_KM, km, legMode, MIN_GAP_KM, obviousCount, planRoute, proofOf, routeKm, routeRules, scoreCities, scoreSponsors, strongestIn, WORLD_GAP_KM, type HeatCell } from "./scoring";
+import { cityAffinity, CITY_RADIUS_KM, DRIVE_KM, isFlat, km, legMode, MIN_GAP_KM, obviousCount, planRoute, proofOf, requestedCheck, routeKm, routeRules, scoreCities, scoreSponsors, strongestIn, WORLD_GAP_KM, type HeatCell } from "./scoring";
 import type { CityHeat } from "./types";
 import { citiesIn, WORLD_CITIES } from "./world";
 import { whyCity } from "./why";
@@ -263,4 +263,28 @@ test("a world tour spreads out: shows far apart, no country with more than its s
   assert.ok(stops.every((a) => stops.every((b) => a === b || km(a, b) >= WORLD_GAP_KM)), "every two shows at least 400 km apart");
   const onlyUs = world.filter((c) => c.country === "US");
   assert.equal(planRoute(onlyUs, { stops: 3, gapKm: rules.gapKm, perCountry: 2 }).length, 3, "fans in one country only: the cap gives way, and the tour keeps its shows");
+});
+
+test("flat signals don't look strong: equal affinities score a neutral 50 with low confidence, and one brand isn't a 90", () => {
+  const flat = us([...around("Nashville", 0.001), ...around("Denver", 0.001), ...around("Boise", 0.001)]);
+  assert.deepEqual(flat.map((c) => c.heat), [50, 50, 50]);
+  assert.ok(flat.every((c) => c.confidence === "low" && !c.hidden), "no city is called confident or hidden on a flat signal");
+  assert.ok(isFlat([0.8, 0.81, 0.805]) && !isFlat([0.5, 0.9]) && isFlat([0.4]));
+  const near = us([...around("Nashville", 0.9), ...around("Denver", 0.3)]);
+  assert.deepEqual(near.map((c) => c.heat), [100, 0], "a real difference still spans the scale");
+  const [only] = scoreSponsors([{ id: "B1", name: "Niche", affinity: 0.001, popularity: 0.5, tags: [] }], { basis: "act" });
+  assert.ok(only.fit < 70 && only.confidence === "low", `one brand has nothing to be compared with: fit ${only.fit}`);
+});
+
+test("cities asked for are each played once, and any that can't be is reported, as are two kept too close together", () => {
+  const cells = [...around("Nashville", 0.9), ...around("Murfreesboro", 0.8), ...around("Denver", 0.7), ...around("Boise", 0.6), ...around("Austin", 0.5)];
+  const cities = us(cells);
+  const id = (name: string) => cities.find((c) => c.name === name)!.id;
+  const includeCityIds = [id("Nashville"), id("Nashville"), id("Murfreesboro"), "us-atlantis", id("Denver"), id("Boise")];
+  const route = planRoute(cities, { stops: 3, includeCityIds });
+  assert.equal(new Set(route.map((r) => r.cityId)).size, route.length, "no city twice");
+  const check = requestedCheck(cities, route, { includeCityIds });
+  assert.deepEqual(check.noData, ["us-atlantis"]);
+  assert.deepEqual(check.cut.map((c) => cities.find((x) => x.id === c)?.name), ["Boise"], "the one that didn't fit in three shows");
+  assert.deepEqual(check.close.map(([a, b]) => [a.name, b.name]), [["Nashville", "Murfreesboro"]], "kept because asked for, and said");
 });

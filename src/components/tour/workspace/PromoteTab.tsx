@@ -30,8 +30,11 @@ export function PromoteTab({ plan, stop, onStop, guide, reload }: { plan: Plan; 
   const d = plan.fanDna.demographics;
   const city = plan.cities.find((c) => c.id === stop);
   const ages = d ? [...d.age].sort((a, b) => b.skew - a.skew) : [];
-  const gender = d && (d.gender.male > 0.1 ? "more men than women" : d.gender.female > 0.1 ? "more women than men" : "as many women as men");
+  // Qloo's demographics are skews against its average audience, not shares: "skewing male" is more men than usual, not
+  // more men than women, and a skew near zero says nothing about the split.
+  const gender = d && (d.gender.male > 0.1 ? "male" : d.gender.female > 0.1 ? "female" : undefined);
   const most = ages[0] && ages[0].skew > 0 ? ages[0].band : undefined;
+  const widened = plan.provenance && plan.signal.basis === "act" && plan.provenance.audience !== "act";
   const parts = [
     { id: "hl-who", label: "Who they are", show: true },
     { id: "hl-reach", label: "How to reach them", show: !!plan.fanDna.loves.length },
@@ -59,8 +62,12 @@ export function PromoteTab({ plan, stop, onStop, guide, reload }: { plan: Plan; 
         </h3>
         {(most || gender) && (
           <p className="hl-fan-line">
-            {plan.act.name}&apos;s fans are {most ? `most often ${most}` : "of every age"}
-            {gender ? `, and ${gender}` : ""}.
+            Against Qloo&apos;s average audience, {plan.act.name}&apos;s fans skew {[most, gender].filter(Boolean).join(" and ")}.
+          </p>
+        )}
+        {widened && (
+          <p className="hl-note">
+            Part of this profile is estimated from {plan.act.name}&apos;s fans together with acts like it ({plan.signal.similar.map((a) => a.name).join(", ")}): Qloo had too little for {plan.act.name} alone.
           </p>
         )}
         {!!plan.fanDna.tags.length && (

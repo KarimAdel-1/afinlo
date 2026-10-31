@@ -18,8 +18,17 @@ export function FundTab({ plan, turnedDown, actions, deck }: { plan: Plan; turne
     <>
       <div className="hl-section-head">
         <h2>Find the money</h2>
-        <p>Brands these fans already love, ranked by Sponsor Fit: Qloo&apos;s affinity, the categories you chose and brand size. Prospects to pitch, not deals.</p>
+        <p>
+          Brands these fans already love, ranked by Sponsor Fit: Qloo&apos;s affinity, the categories you chose and brand size. It ranks how well a brand&apos;s customers overlap with the fans, not
+          whether the brand sponsors tours or would say yes. Prospects to pitch, not deals.
+        </p>
       </div>
+      {plan.provenance && plan.signal.basis === "act" && plan.provenance.sponsors !== "act" && (
+        <p className="hl-note">
+          These brands come from {plan.act.name}&apos;s fans together with acts like it ({plan.signal.similar.slice(0, 3).map((a) => a.name).join(", ")}): Qloo had few brand matches for {plan.act.name} alone, so no
+          sponsor here is high confidence.
+        </p>
+      )}
 
       <section className="hl-card hl-deckcard" aria-label="Pitch deck">
         <div>

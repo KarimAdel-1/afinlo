@@ -202,7 +202,11 @@ export function TourView({
           {/* Whose data it is and how far the tour has got, on one line. */}
           <div className="hl-tour-meta">
             <div className="hl-tour-chips">
-              {plan.signal.basis === "act" ? (
+              {plan.signal.basis === "act" && plan.provenance && (plan.provenance.sponsors !== "act" || plan.provenance.audience !== "act") ? (
+                <span className="hl-chip hl-chip-warn">
+                  <AlertTriangle size={14} aria-hidden /> Map from {plan.act.name}&apos;s own data; {plan.provenance.sponsors !== "act" ? "sponsors" : "part of the audience"} from similar acts too
+                </span>
+              ) : plan.signal.basis === "act" ? (
                 <span className="hl-chip hl-chip-good">
                   <BadgeCheck size={14} aria-hidden /> From {plan.act.name}&apos;s own Qloo data
                 </span>

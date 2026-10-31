@@ -5,7 +5,7 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import type { TasteTrace } from "@/core/taste/types";
 import { whereLabel, type Where } from "@/core/tour/regions";
-import { planRoute, proofOf, routeRules, scoreCities, scoreSponsors, strongestIn, type BrandResult, type HeatCell } from "@/core/tour/scoring";
+import { isFlat, planRoute, proofOf, requestedCheck, routeRules, scoreCities, scoreSponsors, strongestIn, type BrandResult, type HeatCell } from "@/core/tour/scoring";
 import { newActId, newActOf } from "@/core/tour/named";
 import { cellsIn, citiesIn, locationOf } from "@/core/tour/world";
 import {
@@ -28,6 +28,7 @@ import {
 import type { QlooClient } from "../taste/qloo";
 import { actById, audienceTags, brands as qlooBrands, demographics, qlooClient, heatCells, loves, namedActs, placesNear, sharedTags, similarActs, TRANSPORT, VENUE_TAGS } from "./qloo";
 import { heatPoints, keepCities } from "@/core/tour/geo";
+import { cityById } from "@/core/tour/world";
 import { newPlanId } from "./store";
 import { defaultWriter, type Writer } from "./writer";
 
@@ -40,6 +41,9 @@ const State = Annotation.Root({
   basis: replace<Plan["signal"]["basis"]>(() => "act"),
   similar: replace<(PlanEntity & { affinity: number; comedian: boolean })[]>(() => []),
   signalIds: replace<string[]>(() => []),
+  /** Whether the brands, or any part of the audience profile, came from the act together with acts like it. */
+  brandsWidened: replace<boolean>(() => false),
+  audienceWidened: replace<boolean>(() => false),
   cells: replace<HeatCell[]>(() => []),
   fanDna: replace<FanDNA>(() => ({ tags: [], loves: [] })),
   brands: replace<BrandResult[]>(() => []),
@@ -161,17 +165,22 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
     // Each part of the profile is optional: a part Qloo can't answer for the act is asked of the act with acts like
     // it, and a part still unanswered is left out, never filled in.
     const wide = wideSignal(s);
+    let widened = false;
     const ask = async <T,>(get: (ids: string[]) => Promise<T>, empty: (v: T) => boolean): Promise<T | undefined> => {
       const first = await get(s.signalIds).catch(() => undefined);
       if (first !== undefined && !empty(first)) return first;
-      return wide.length > s.signalIds.length ? get(wide).catch(() => first) : first;
+      if (wide.length <= s.signalIds.length) return first;
+      const wider = await get(wide).catch(() => undefined);
+      if (wider === undefined || empty(wider)) return first;
+      widened = true;
+      return wider;
     };
     const [tags, demo, love] = await Promise.all([
       ask((ids) => audienceTags(client, ids, traces, signal), (v) => !v.length),
       ask((ids) => demographics(client, ids, traces, signal), (v) => !v),
       ask((ids) => loves(client, ids, traces, signal), (v) => !v.length),
     ]);
-    return { fanDna: { tags: tags ?? [], demographics: demo, loves: love ?? [] } };
+    return { fanDna: { tags: tags ?? [], demographics: demo, loves: love ?? [] }, audienceWidened: widened };
   };
 
   const sponsors = async (s: S): Promise<Partial<S>> => {
@@ -190,7 +199,7 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
       if (wider.length > found.length) {
         found = wider;
         const why = failed ? `Qloo's brand search didn't answer for ${s.act!.name} alone` : `Qloo has few brand matches for ${s.act!.name} alone`;
-        return { brands: found, notes: [`${why}, so sponsors are brands loved by ${s.act!.name}'s audience together with audiences of similar acts (${s.similar.slice(0, 3).map((p) => p.name).join(", ")}).`] };
+        return { brands: found, brandsWidened: true, notes: [`${why}, so sponsors are brands loved by ${s.act!.name}'s audience together with audiences of similar acts (${s.similar.slice(0, 3).map((p) => p.name).join(", ")}).`] };
       }
     }
     if (!found.length && traces.some((t) => t.tool === "qloo_recommend" && t.parameters["filter.type"] === "urn:entity:brand" && t.status === "error"))
@@ -226,15 +235,28 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
       includeCityIds: s.request.includeCityIds,
       focus: s.request.focus,
     });
+    // Brands from the act together with acts like it are never high confidence, whatever the map's basis.
     const scored = scoreSponsors(s.brands, {
       categoryTags: s.request.categories.map((c) => SPONSOR_CATEGORIES[c].tag),
       avoidTags: (s.request.avoid ?? []).map((c) => SPONSOR_CATEGORIES[c].tag),
       excludeBrandIds: s.request.excludeBrandIds,
-      basis,
+      basis: s.brandsWidened ? "similar" : basis,
     });
     const notes: string[] = [];
     if (!cities.length) notes.push(`Qloo has no location data for ${s.act!.name} or acts like it in ${whereLabel(area)} yet, so Afinlo can't say where the fans are there. It won't guess.`);
     if (!scored.length) notes.push(s.request.categories.length ? "No brands in those categories came back for this audience. Try other categories." : "Qloo returned no brands for this audience.");
+    // Scores that don't tell candidates apart are said to, rather than shown as if they did.
+    if (cities.length > 1 && isFlat(cities.map((c) => c.affinity)))
+      notes.push(`Qloo's affinity for ${s.act!.name} barely differs across ${whereLabel(area)}'s cities, so Fan Heat doesn't tell them apart: every city shows 50, with low confidence, and the route leans on market size and spacing.`);
+    if (scored.length > 1 && isFlat(scored.map((x) => x.affinity))) notes.push("The brands Qloo found match these fans about equally, so Sponsor Fit here mostly reflects brand size, not a stronger match.");
+    // Every requirement is met or reported: fewer stops than asked, and cities asked for that couldn't be played.
+    const nameOf = (id: string) => cities.find((c) => c.id === id)?.name ?? cityById(id)?.name ?? id;
+    if (cities.length && route.length < s.request.stops)
+      notes.push(`${route.length} stops fit of the ${s.request.stops} asked for: only ${route.length} cities in ${whereLabel(area)} have data for this act and are at least ${rules.gapKm ?? 150} km apart. A wider area would fit more.`);
+    const asked = requestedCheck(cities, route, { includeCityIds: s.request.includeCityIds, excludeCityIds: s.request.excludeCityIds, gapKm: rules.gapKm });
+    if (asked.noData.length) notes.push(`Not on the route, though asked for: ${asked.noData.map(nameOf).join(", ")}. Qloo has no data for this act there, or it was left out.`);
+    if (asked.cut.length) notes.push(`Not on the route, though asked for: ${asked.cut.map(nameOf).join(", ")}. The cities asked for are more than the ${s.request.stops} shows; add shows to play them all.`);
+    for (const [a, b, apart] of asked.close) notes.push(`${a.name} and ${b.name} are both on the route because you asked for them, though they're only ${apart} km apart (shows are usually kept ${asked.gap} km apart, so two don't compete for the same fans).`);
     return { cities, route, proof: proofOf(cities, route), sponsors: scored.map((x) => ({ ...x, strongestIn: [] })), notes };
   };
 
@@ -270,7 +292,7 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
     stage({ stage: "writing" });
     const routeCities = s.route.map((r) => s.cities.find((c) => c.id === r.cityId)!).filter(Boolean);
     const pitch = await writer(
-      { act: s.act!, fanDna: s.fanDna, sponsors: s.sponsors, supportActs: s.supportActs, signal: signalOf(s), route: routeCities, stops: s.request.stops },
+      { act: s.act!, fanDna: s.fanDna, sponsors: s.sponsors, supportActs: s.supportActs, signal: signalOf(s), route: routeCities, stops: routeCities.length },
       signal,
     );
     return { pitch };
@@ -304,6 +326,7 @@ export async function planTour(input: PlanInput, deps: AgentDeps = {}): Promise<
     request,
     act: s.act!,
     signal: signalOf(s),
+    provenance: { sponsors: s.basis === "act" && s.brandsWidened ? "similar" : s.basis, audience: s.basis === "act" && s.audienceWidened ? "similar" : s.basis },
     fanDna: s.fanDna,
     heatPoints: heatPoints(cellsIn(s.cells, area)),
     area: whereLabel(area),

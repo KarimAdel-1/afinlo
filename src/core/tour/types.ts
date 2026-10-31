@@ -210,6 +210,11 @@ export interface Plan {
    * doesn't know, the acts named as like it ("named", in `similar`).
    */
   signal: { basis: "act" | "similar" | "named"; similar: PlanEntity[] };
+  /**
+   * Whose data each other section is from, where it can differ from the map's: the sponsors, or part of the audience
+   * profile, widened to the acts in `signal.similar` when Qloo had too little for the act alone. Absent on older plans.
+   */
+  provenance?: { sponsors: Plan["signal"]["basis"]; audience: Plan["signal"]["basis"] };
   fanDna: FanDNA;
   /** Qloo's heatmap for the real map: [latitude, longitude, weight 0–1], the stronger half of the cells. */
   heatPoints?: [number, number, number][];
