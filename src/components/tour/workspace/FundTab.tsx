@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Ban, Download, Eye, LoaderCircle, MapPin, Send, TrendingUp } from "lucide-react";
-import { PITCH_LABELS, PITCH_STATUSES, type Plan, type PitchStatus } from "@/core/tour/types";
+import { Ban, Download, Eye, FileText, LoaderCircle, MapPin, Send, TrendingUp } from "lucide-react";
+import { PITCH_LABELS, PITCH_STATUSES, SPONSOR_CATEGORIES, type Plan, type PitchStatus, type Prospect, type SavedDraft } from "@/core/tour/types";
 import { daysSince, FOLLOW_UP_DAYS } from "@/core/tour/next";
 import { Avatar } from "../Avatar";
 import { categoryOf, ringDash, TIER } from "../sponsors";
@@ -10,8 +10,27 @@ import { followUpDraft, sponsorDraft } from "./drafts";
 import { StatusSelect } from "./parts";
 import type { TourActions } from "./TourView";
 
-/** Funding the tour: the brands these fans love, ranked by Sponsor Fit, each with its pitch and where it stands. */
-export function FundTab({ plan, turnedDown, actions, deck }: { plan: Plan; turnedDown: string[]; actions: TourActions; deck: { busy: boolean; download: () => void } }) {
+const DRAFT_KIND = { pitch: "Pitch", hold: "Hold request", post: "Post" } as const;
+
+/**
+ * Funding the tour: the brands these fans love, ranked by Sponsor Fit, each with its pitch and where it stands; then the
+ * brands the tour team found in chat, and the drafts it wrote, kept with the tour to come back to.
+ */
+export function FundTab({
+  plan,
+  turnedDown,
+  actions,
+  deck,
+  prospects = [],
+  drafts = [],
+}: {
+  plan: Plan;
+  turnedDown: string[];
+  actions: TourActions;
+  deck: { busy: boolean; download: () => void };
+  prospects?: Prospect[];
+  drafts?: SavedDraft[];
+}) {
   const sponsors = plan.sponsors.filter((s) => !turnedDown.includes(s.brand.id));
   const city = (id: string) => plan.cities.find((c) => c.id === id)?.name;
   return (
@@ -109,6 +128,63 @@ export function FundTab({ plan, turnedDown, actions, deck }: { plan: Plan; turne
       )}
       {!!turnedDown.length && plan.sponsors.some((s) => turnedDown.includes(s.brand.id)) && (
         <p className="hl-hint">Brands you said no to are hidden here and left out of {plan.act.name}&apos;s next tours.</p>
+      )}
+
+      {/* What the tour team found and wrote in chat, kept with the tour however long the conversation gets. */}
+      {!!prospects.filter((p) => !turnedDown.includes(p.id)).length && (
+        <section className="hl-card hl-kept" aria-labelledby="hl-found-title">
+          <h3 id="hl-found-title" className="hl-card-title">
+            Found by your tour team
+          </h3>
+          <p className="hl-hint">More brands these fans love, found in chat. Ask the team to pitch any of them.</p>
+          <ul>
+            {prospects
+              .filter((p) => !turnedDown.includes(p.id))
+              .map((p) => {
+                const status = (actions.statusOf("sponsor", p.id)?.status ?? "to_send") as PitchStatus;
+                return (
+                  <li key={p.id}>
+                    <span>
+                      <b>{p.name}</b>
+                      <small>
+                        Sponsor Fit {p.fit} · {SPONSOR_CATEGORIES[p.category]?.label ?? "Brand"} · {TIER[p.tier]}
+                      </small>
+                    </span>
+                    <StatusSelect value={status} options={PITCH_STATUSES} labels={PITCH_LABELS} label={`Where the pitch to ${p.name} stands`} onChange={(v) => actions.setTrack("sponsor", p.id, v)} />
+                  </li>
+                );
+              })}
+          </ul>
+        </section>
+      )}
+      {!!drafts.length && (
+        <section className="hl-card hl-kept" aria-labelledby="hl-drafts-title">
+          <h3 id="hl-drafts-title" className="hl-card-title">
+            Your drafts
+          </h3>
+          <ul>
+            {drafts.map((d) => (
+              <li key={d.id}>
+                <span>
+                  <b>
+                    <FileText size={14} aria-hidden /> {DRAFT_KIND[d.draft.type]} for {d.draft.to}
+                  </b>
+                  <small>
+                    {d.draft.language} · {new Date(d.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    {d.planId !== plan.id ? " · written for an earlier version of the tour: check it still fits" : ""}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  className="hl-button hl-button-quiet hl-button-small"
+                  onClick={() => actions.openDraft({ to: d.draft.to, subject: d.draft.subject ?? `Post for ${d.draft.to}`, body: d.draft.body })}
+                >
+                  Open
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section className="hl-card hl-onepager" aria-labelledby="hl-one-title">

@@ -12,7 +12,8 @@ import { testBrowser, testDatabase } from "@/testing/database";
 import { ACT, fixtureQloo } from "@/testing/qloo";
 import { calls, ScriptedModel } from "@/testing/scripted";
 import { planTour } from "../tour/agent";
-import { actMemory, tracksFor } from "../tour/tracker";
+import { actMemory, tourOf, tracksFor } from "../tour/tracker";
+import { draftsFor, keepProspects, prospectsFor } from "../tour/work";
 import { templatePitch } from "../tour/writer";
 import { askManager, managerHistory, TurnFailed } from "./chat";
 import { LIMITS, type Role } from "./graph";
@@ -316,4 +317,26 @@ test("a reply that fails after something was saved says what was saved, rather t
     return true;
   });
   assert.deepEqual((await actMemory(browser, plan.act.id))?.avoid, ["alcohol"], "and it is saved");
+});
+
+test("a brand found for the tour in one message can be pitched in the next, and the draft is kept with the tour", async () => {
+  const plan = await tour();
+  const browser = testBrowser();
+  const tourId = tourOf(plan);
+  // As more_brands keeps what it finds.
+  await keepProspects(browser, tourId, [{ id: "BBBBBBBB-0000-4000-8000-000000000042", name: "Found Later Co", fit: 71, tier: "niche", category: "drinks" }]);
+  const manager = new ScriptedModel([calls(["ask_sponsor_scout", { task: "Pitch Found Later Co." }])]);
+  const sponsors = new ScriptedModel([
+    calls(["sponsor_list", {}]),
+    (m) => {
+      assert.match(results(m).join(), /foundEarlier[\s\S]*Found Later Co/, "the brand found earlier is listed to pitch");
+      return calls(["save_draft", { to: "Found Later Co", language: "English", subject: "A tour partnership", body: "Hi Found Later Co partnerships team: these fans love your brand. Could we talk about the tour?" }]);
+    },
+    "Saved the pitch.",
+  ]);
+  const out = await ask(plan, "Pitch Found Later Co", { manager, sponsors }, { browser });
+  assert.equal(out.cards[0]?.kind, "draft");
+  const kept = await draftsFor(browser, tourId);
+  assert.deepEqual(kept.map((d) => [d.draft.to, d.planId]), [["Found Later Co", plan.id]], "kept with the tour and the version it was written for");
+  assert.equal((await prospectsFor(browser, tourId))[0].name, "Found Later Co");
 });

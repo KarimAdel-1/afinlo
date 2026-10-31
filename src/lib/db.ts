@@ -37,6 +37,14 @@ const TABLES = [
      visitor TEXT NOT NULL, act_id TEXT NOT NULL, act TEXT NOT NULL, prefs TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (visitor, act_id)
    )`,
   `CREATE TABLE IF NOT EXISTS tour_profiles (visitor TEXT PRIMARY KEY, profile TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+  // A tour's lasting work beyond its plan, per browser (src/platform/tour/work.ts): brands its team found, and drafts.
+  `CREATE TABLE IF NOT EXISTS tour_prospects (
+     visitor TEXT NOT NULL, tour_id TEXT NOT NULL, brand_id TEXT NOT NULL, name TEXT NOT NULL, fit INTEGER NOT NULL, tier TEXT NOT NULL,
+     category TEXT NOT NULL, found_at TEXT NOT NULL, PRIMARY KEY (visitor, tour_id, brand_id)
+   )`,
+  `CREATE TABLE IF NOT EXISTS tour_drafts (
+     id TEXT PRIMARY KEY, visitor TEXT NOT NULL, tour_id TEXT NOT NULL, plan_id TEXT NOT NULL, draft TEXT NOT NULL, created_at TEXT NOT NULL
+   )`,
   // A browser's conversations with the assistant on Home: each its own LangGraph thread (src/platform/assistant/chat.ts).
   `CREATE TABLE IF NOT EXISTS tour_assistant_chats (
      visitor TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (visitor, id)

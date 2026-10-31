@@ -278,6 +278,23 @@ export const TOUR_TABS = ["plan", "book", "fund", "promote", "next"] as const;
 export type TourTab = (typeof TOUR_TABS)[number];
 export const TOUR_TAB_LABELS: Record<TourTab, string> = { plan: "Plan", book: "Book", fund: "Fund", promote: "Promote", next: "Next up" };
 
+/** A brand the tour's team found in Qloo beyond the plan's sponsors, kept with the tour to pitch in a later message. */
+export interface Prospect {
+  id: string;
+  name: string;
+  fit: number;
+  tier: Sponsor["tier"];
+  category: SponsorCategory;
+  foundAt: string;
+}
+/** A draft the team wrote, kept with the tour, with the version of the tour it was written for. */
+export interface SavedDraft {
+  id: string;
+  planId: string;
+  createdAt: string;
+  draft: AgentDraft;
+}
+
 /** Where the user is in the tour as they send a message: the tab, and the stop in hand. */
 export interface TourContext {
   tab: TourTab;

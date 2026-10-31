@@ -30,6 +30,7 @@ import { citiesIn, locationOf } from "@/core/tour/world";
 import { brands as qlooBrands, heatCells } from "../tour/qloo";
 import { data } from "../tour/model";
 import { rememberAct, setTrack } from "../tour/tracker";
+import { keepDraft, keepProspects } from "../tour/work";
 import { unsupportedClaim } from "@/core/tour/claims";
 import { matchCity } from "../tour/writer";
 import { areaCityNamed, brandNamed, cardId, cityNamed, guideFor, named, routeOf, type Desk } from "./desk";
@@ -128,7 +129,7 @@ function saveDraft(desk: Desk, agent: Specialist, type: AgentDraft["type"]) {
       body: z.string().min(20).max(4000),
     }),
     label: (d) => `Saving a draft for ${d.to}`,
-    run: (d) => {
+    run: async (d) => {
       const target =
         type === "pitch"
           ? brandNamed(desk, d.to)
@@ -154,8 +155,11 @@ function saveDraft(desk: Desk, agent: Specialist, type: AgentDraft["type"]) {
       if (type !== "post" && !d.subject?.trim()) return "Refused: an email needs a subject line. Add one and save again.";
       const max = type === "post" ? 700 : 1800;
       if (d.body.length > max) return `Refused: it's ${d.body.length} characters. Keep it under ${max} and save again.`;
-      keep(desk, agent, { id: cardId(), kind: "draft", draft: { type, to: target.name, toId: target.id, language: d.language, ...(d.subject ? { subject: d.subject.trim() } : {}), body: d.body.trim() } });
-      return `Saved: the user sees the draft for ${target.name} under the reply.`;
+      const draft = { type, to: target.name, toId: target.id, language: d.language, ...(d.subject ? { subject: d.subject.trim() } : {}), body: d.body.trim() };
+      // Kept with the tour, so it outlasts the conversation: the Fund tab lists it, to reopen any time.
+      await keepDraft(desk.browser, desk.tourId, desk.plan.id, draft);
+      keep(desk, agent, { id: cardId(), kind: "draft", draft });
+      return `Saved: the user sees the draft for ${target.name} under the reply, and it's kept with the tour.`;
     },
   });
 }
@@ -354,8 +358,8 @@ function sponsorTools(desk: Desk): Tool[] {
       description: "The tour's sponsors from Qloo, best fit first: Sponsor Fit, size, the route cities where the brand's own audience is strongest, and where each pitch stands.",
       schema: z.object({ category: sponsorCategory.optional() }),
       label: ({ category }) => (category ? `Reading the ${SPONSOR_CATEGORIES[category].label.toLowerCase()} sponsors` : "Reading the sponsors"),
-      run: ({ category }) =>
-        p.sponsors
+      run: ({ category }) => {
+        const sponsors = p.sponsors
           .filter((s) => !category || s.brand.categories.some((t) => t.startsWith(tagOf(category))))
           // No IDs: the tools find a brand by its name, and an ID costs the model a dozen tokens a line.
           .map((s) => ({
@@ -366,7 +370,11 @@ function sponsorTools(desk: Desk): Tool[] {
             categories: labelsOf(s.brand.categories),
             strongestOnRoute: s.strongestIn.map(nameOf),
             pitch: PITCH_LABELS[(statusOf(desk, "sponsor", s.brand.id)?.status ?? "to_send") as PitchStatus],
-          })),
+          }));
+        // Brands found for this tour in earlier messages, to pitch like the rest.
+        const found = [...desk.found.values()].map((b) => ({ brand: b.name, sponsorFit: b.fit, size: b.tier, pitch: PITCH_LABELS[(statusOf(desk, "sponsor", b.id)?.status ?? "to_send") as PitchStatus] }));
+        return found.length && !category ? { sponsors, foundEarlier: found } : sponsors;
+      },
     }),
     make(desk, "sponsors", {
       name: "more_brands",
@@ -378,7 +386,9 @@ function sponsorTools(desk: Desk): Tool[] {
         const no = new Set([...(p.request.excludeBrandIds ?? []), ...(desk.memory?.excludeBrandIds ?? []), ...p.sponsors.map((s) => s.brand.id)]);
         const avoid = [...(p.request.avoid ?? []), ...(desk.memory?.avoid ?? [])].map(tagOf);
         const scored = scoreSponsors(found, { categoryTags: [tagOf(category)], avoidTags: avoid, excludeBrandIds: [...no], basis: p.signal.basis === "act" ? "act" : "similar" }).slice(0, 8);
+        // Kept with the tour, not only for this message: the next one, and the Fund tab, can pitch them.
         for (const s of scored) desk.found.set(s.brand.id, { id: s.brand.id, name: s.brand.name, fit: s.fit, tier: s.tier });
+        await keepProspects(desk.browser, desk.tourId, scored.map((s) => ({ id: s.brand.id, name: s.brand.name, fit: s.fit, tier: s.tier, category })));
         return scored.length ? scored.map((s) => ({ brand: s.brand.name, sponsorFit: s.fit, size: s.tier })) : `Qloo found no more ${SPONSOR_CATEGORIES[category].label.toLowerCase()} brands for these fans.`;
       },
     }),

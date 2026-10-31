@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowUp, Check, ChevronDown, ChevronUp, FileText, LoaderCircle, MessagesSquare, Route as RouteIcon, Sparkles } from "lucide-react";
 import { SPECIALIST_LABELS, type ManagerCard, type ManagerEvent, type ManagerMessage, type Plan, type Track } from "@/core/tour/types";
 import { streamChat } from "../client";
@@ -37,6 +38,7 @@ function suggestions(plan: Plan) {
  * for this browser, through every change to the tour.
  */
 export function TeamChat({ plan, actions, onTrack }: { plan: Plan; actions: TourActions; onTrack: (t: Omit<Track, "updatedAt">) => void }) {
+  const router = useRouter();
   const [messages, setMessages] = useState<ManagerMessage[]>([]);
   const [summary, setSummary] = useState("");
   const [state, setState] = useState<{ status: "loading" | "ready" } | { status: "off"; note: string }>({ status: "loading" });
@@ -91,6 +93,8 @@ export function TeamChat({ plan, actions, onTrack }: { plan: Plan; actions: Tour
       const answer = await streamChat(plan.id, said, (e) => setSteps((v) => [...(v ?? []), stepOf(e)]));
       for (const card of answer.cards) if (card.kind === "status") onTrack(card.track);
       setMessages((v) => [...v, { role: "assistant", text: answer.reply, agents: answer.agents, cards: answer.cards }]);
+      // A draft written, or brands found, are kept with the tour: the Fund tab lists them once the page catches up.
+      if (answer.cards.some((c) => c.kind === "draft") || answer.agents.includes("sponsors")) router.refresh();
       if (!openNow.current) setUnread(true);
     } catch (e) {
       // What the team saved before the reply failed is applied and shown with the error, so the page matches the tour.

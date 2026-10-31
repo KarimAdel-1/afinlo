@@ -8,6 +8,7 @@ import { knownBrowser } from "@/platform/tour/http";
 import { savedResults } from "@/platform/tour/saved";
 import { getPlan } from "@/platform/tour/store";
 import { actMemory, tourOf, tracksFor } from "@/platform/tour/tracker";
+import { draftsFor, prospectsFor } from "@/platform/tour/work";
 
 const TABS: Tab[] = ["plan", "book", "fund", "promote", "next"];
 
@@ -23,16 +24,20 @@ export default async function TourPage({ params, searchParams }: PageProps<"/tou
   if (!plan) notFound();
   const { tab, stop } = await searchParams;
   const owner = await knownBrowser();
-  const [tracks, memory, saved] = await Promise.all([
+  const [tracks, memory, saved, prospects, drafts] = await Promise.all([
     tracksFor(owner, [tourOf(plan)]).then((m) => m.get(tourOf(plan)) ?? []),
     actMemory(owner, plan.act.id),
     savedResults(owner).then((all) => all.some((s) => s.plan.id === plan.id)),
+    prospectsFor(owner, tourOf(plan)),
+    draftsFor(owner, tourOf(plan)),
   ]);
   const homeCity = plan.request.homeCityId ? (plan.cities.find((c) => c.id === plan.request.homeCityId) ?? cityById(plan.request.homeCityId)) : undefined;
   return (
     <TourView
       plan={plan}
       tracks={tracks}
+      prospects={prospects}
+      drafts={drafts}
       memory={memory}
       saved={saved}
       home={homeCity && { name: homeCity.name, lat: homeCity.lat, lon: homeCity.lon }}

@@ -10,6 +10,7 @@ import { setting } from "@/lib/settings";
 import type { ManagerCard, ManagerEvent, ManagerMessage, Plan, Specialist } from "@/core/tour/types";
 import type { QlooClient } from "../taste/qloo";
 import { qlooClient } from "../tour/qloo";
+import { prospectsFor } from "../tour/work";
 import { actMemory, tourOf, tracksFor } from "../tour/tracker";
 import { openDesk } from "./desk";
 import { agentOf, managerGraph, textOf, thisTurn, type Models } from "./graph";
@@ -66,8 +67,9 @@ export async function askManager(
 ): Promise<{ reply: string; agents: Specialist[]; cards: ManagerCard[] }> {
   const { plan, browser } = input;
   const tourId = tourOf(plan);
-  const [tracks, memory] = await Promise.all([tracksFor(browser, [tourId]).then((t) => t.get(tourId) ?? []), actMemory(browser, plan.act.id)]);
-  const desk = openDesk({ plan, browser, tracks, memory, client: deps.client ?? qlooClient(), signal: input.signal, emit: input.emit ?? (() => {}) });
+  // The brands the team found for this tour in earlier messages come back, so they can be pitched now.
+  const [tracks, memory, found] = await Promise.all([tracksFor(browser, [tourId]).then((t) => t.get(tourId) ?? []), actMemory(browser, plan.act.id), prospectsFor(browser, tourId)]);
+  const desk = openDesk({ plan, browser, tracks, memory, found, client: deps.client ?? qlooClient(), signal: input.signal, emit: input.emit ?? (() => {}) });
   // Every model call's tokens, by role, logged and kept once the message is done, answered or not.
   const meter = usageMeter("tour", browser);
   const graph = managerGraph(desk, deps.models ?? openAiModels(meter.add), deps.checkpointer ?? (await checkpointer()));

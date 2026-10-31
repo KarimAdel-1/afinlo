@@ -38,8 +38,10 @@ export interface Desk {
   guides: Map<string, CityGuide>;
 }
 
-export function openDesk(input: Pick<Desk, "plan" | "browser" | "tracks" | "memory" | "client" | "signal" | "emit">): Desk {
-  return { ...input, tourId: tourOf(input.plan), made: [], toolCalls: 0, found: new Map(), guides: new Map() };
+/** The turn's desk; `found` is what the team found for the tour in earlier messages (kept in tour_prospects), to pitch now. */
+export function openDesk(input: Pick<Desk, "plan" | "browser" | "tracks" | "memory" | "client" | "signal" | "emit"> & { found?: FoundBrand[] }): Desk {
+  const { found = [], ...rest } = input;
+  return { ...rest, tourId: tourOf(input.plan), made: [], toolCalls: 0, found: new Map(found.map((b) => [b.id, b])), guides: new Map() };
 }
 
 export const cardId = () => randomUUID().slice(0, 8);

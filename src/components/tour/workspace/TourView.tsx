@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, BadgeCheck, Bookmark, BookmarkCheck, CalendarCheck, Download, Handshake, Link2, ListChecks, LoaderCircle, Megaphone, Route as RouteIcon, X } from "lucide-react";
 import { nextUp } from "@/core/tour/next";
-import type { ActMemory, TourStage, Plan, PlanInput, Track } from "@/core/tour/types";
+import type { ActMemory, TourStage, Plan, PlanInput, Prospect, SavedDraft, Track } from "@/core/tour/types";
 import { AgentTrace } from "../AgentTrace";
 import { Avatar } from "../Avatar";
 import { postJson, streamPlan } from "../client";
@@ -58,8 +58,13 @@ export function TourView({
   saved: initiallySaved,
   initialTab = "plan",
   initialStop,
+  prospects = [],
+  drafts = [],
 }: {
   plan: Plan;
+  /** What the tour team found and wrote in chat, kept with the tour (src/platform/tour/work.ts). */
+  prospects?: Prospect[];
+  drafts?: SavedDraft[];
   tracks: Track[];
   home?: { name: string; lat: number; lon: number };
   memory?: ActMemory;
@@ -301,7 +306,7 @@ export function TourView({
         <div className="hl-tour-body">
           {tab === "plan" && <PlanTab plan={plan} routeCities={routeCities} active={active} onActive={setActive} actions={actions} running={!!run && !run.error} />}
           {tab === "book" && <BookTab plan={plan} stop={stop} onStop={setStop} guide={guide} reload={(id) => void load(id, true)} actions={actions} />}
-          {tab === "fund" && <FundTab plan={plan} turnedDown={turnedDown} actions={actions} deck={{ busy: deck.busy, download: () => void downloadDeck() }} />}
+          {tab === "fund" && <FundTab plan={plan} turnedDown={turnedDown} actions={actions} deck={{ busy: deck.busy, download: () => void downloadDeck() }} prospects={prospects} drafts={drafts} />}
           {tab === "promote" && <PromoteTab plan={plan} stop={stop} onStop={setStop} guide={guide} reload={(id) => void load(id, true)} />}
           {tab === "next" && <NextTab plan={plan} tasks={tasks} progress={progress} actions={actions} />}
         </div>
