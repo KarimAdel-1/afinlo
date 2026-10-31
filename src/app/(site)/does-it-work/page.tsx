@@ -17,7 +17,8 @@ export const metadata: Metadata = {
 interface Backtest {
   generatedAt: string;
   method: string;
-  acts: { act: string; source: string; checkedAt: string; actual: string[]; afinlo: string[]; baseline?: string[]; afinloHits: number; baselineHits?: number }[];
+  // `recorded` is every city written down (a miss when it can't be matched); older results called the matched ones `actual`.
+  acts: { act: string; source: string; checkedAt: string; recorded?: string[]; actual?: string[]; afinlo: string[]; baseline?: string[]; afinloHits: number; baselineHits?: number }[];
   summary: { acts: number; afinloHitRate: number; baselineHitRate?: number };
 }
 
@@ -181,14 +182,14 @@ export default async function DoesItWork() {
                       <tr key={a.act}>
                         <td>{a.act}</td>
                         <td>
-                          {a.actual.join(", ")}
+                          {(a.recorded ?? a.actual ?? []).join(", ")}
                           <br />
                           {a.source}, {a.checkedAt}
                         </td>
                         <td>
-                          {a.afinloHits} of {a.actual.length}
+                          {a.afinloHits} of {(a.recorded ?? a.actual ?? []).length}
                         </td>
-                        <td>{a.baselineHits !== undefined ? `${a.baselineHits} of ${a.actual.length}` : "—"}</td>
+                        <td>{a.baselineHits !== undefined ? `${a.baselineHits} of ${(a.recorded ?? a.actual ?? []).length}` : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
