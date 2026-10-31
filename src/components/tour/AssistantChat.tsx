@@ -346,13 +346,16 @@ export function AssistantChat({ hasTours, name, chat: initialChat }: { hasTours:
               ),
             )}
             {steps && (
-              <ol className="hl-team-steps" aria-label="What the assistant is doing">
-                {[...(steps.length ? steps : ["Reading your message"])].map((s, i, all) => (
-                  <li key={i}>
-                    {i === all.length - 1 ? <LoaderCircle size={14} className="hl-spin" aria-hidden /> : <Check size={14} aria-hidden />} {s}
-                  </li>
-                ))}
-              </ol>
+              <div className="hl-assist-working">
+                <Mascot size={52} thinking />
+                <ol className="hl-team-steps" aria-label="What the assistant is doing">
+                  {[...(steps.length ? steps : ["Reading your message"])].map((s, i, all) => (
+                    <li key={i}>
+                      {i === all.length - 1 ? <LoaderCircle size={14} className="hl-spin" aria-hidden /> : <Check size={14} aria-hidden />} {s}
+                    </li>
+                  ))}
+                </ol>
+              </div>
             )}
             {error && (
               <p className="hl-error" role="alert">

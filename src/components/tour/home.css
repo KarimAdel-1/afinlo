@@ -402,7 +402,16 @@
   display: none;
 }
 
-/* The mascot, with what to ask floating by it */
+/* The mascot, with what to ask floating by it; small beside what the assistant is doing while it works. */
+.hl-assist-working {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.hl-assist-working .hl-mascot {
+  flex-shrink: 0;
+  animation: none;
+}
 .hl-assist-stage {
   position: relative;
   display: grid;
@@ -411,11 +420,6 @@
 }
 .hl-mascot {
   animation: hl-hover 5s ease-in-out infinite;
-}
-.hl-mascot-eye {
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: hl-blink 6s infinite;
 }
 .hl-assist-bubble {
   position: absolute;
@@ -456,18 +460,8 @@
     transform: translateY(-6px);
   }
 }
-@keyframes hl-blink {
-  0%,
-  92%,
-  100% {
-    transform: scaleY(1);
-  }
-  95% {
-    transform: scaleY(0.15);
-  }
-}
 
-/* The message box: a strip on top, the input, then what it can do, the mic and send */
+/* The message box: a strip on top, the input, then what it can do, and send */
 .hl-assist-box {
   position: sticky;
   bottom: 14px;
@@ -705,7 +699,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .hl-mascot,
-  .hl-mascot-eye,
   .hl-assist-bubble {
     animation: none;
   }
