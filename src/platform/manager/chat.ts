@@ -14,6 +14,7 @@ import { actMemory, tourOf, tracksFor } from "../tour/tracker";
 import { openDesk } from "./desk";
 import { agentOf, managerGraph, textOf, thisTurn, type Models } from "./graph";
 import { openAiModels } from "./models";
+import { usageMeter } from "./usage";
 
 export interface ManagerDeps {
   models?: Models;
@@ -54,13 +55,19 @@ export async function askManager(
   const tourId = tourOf(plan);
   const [tracks, memory] = await Promise.all([tracksFor(browser, [tourId]).then((t) => t.get(tourId) ?? []), actMemory(browser, plan.act.id)]);
   const desk = openDesk({ plan, browser, tracks, memory, client: deps.client ?? qlooClient(), signal: input.signal, emit: input.emit ?? (() => {}) });
-  const graph = managerGraph(desk, deps.models ?? openAiModels(), deps.checkpointer ?? (await checkpointer()));
-  const out = await graph.invoke(
-    { messages: [new HumanMessage({ content: input.message, id: randomUUID() })] },
-    { configurable: { thread_id: threadOf(plan, browser) }, signal: input.signal, recursionLimit: 40 },
-  );
-  const turn = thisTurn(out.messages);
-  return { reply: textOf(turn.at(-1)), agents: agentsIn(turn), cards: desk.made.map((m) => m.card) };
+  // Every model call's tokens, by role, logged and kept once the message is done, answered or not.
+  const meter = usageMeter("tour", browser);
+  const graph = managerGraph(desk, deps.models ?? openAiModels(meter.add), deps.checkpointer ?? (await checkpointer()));
+  try {
+    const out = await graph.invoke(
+      { messages: [new HumanMessage({ content: input.message, id: randomUUID() })] },
+      { configurable: { thread_id: threadOf(plan, browser) }, signal: input.signal, recursionLimit: 40 },
+    );
+    const turn = thisTurn(out.messages);
+    return { reply: textOf(turn.at(-1)), agents: agentsIn(turn), cards: desk.made.map((m) => m.card) };
+  } finally {
+    await meter.save();
+  }
 }
 
 /** The conversation as the page shows it: the user's messages and the manager's replies, each with what it made. */

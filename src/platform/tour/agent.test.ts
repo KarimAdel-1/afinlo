@@ -85,7 +85,8 @@ test("an unknown act is a clear error, and the writer's checks catch invented ID
   assert.match(checkPitch({ ...base, emails: [{ brandId: "CCCCCCCC-0000-4000-8000-999999999999", subject: "s", body: "b" }] }, facts)!, /brand/);
   assert.match(checkPitch({ ...base, cityNotes: [{ cityId: city("Miami").id, note: "n" }] }, facts)!, /city/);
   assert.match(checkPitch({ ...base, ask: "A $50,000 package" }, facts)!, /money/);
-  assert.match(checkPitch({ ...base, ask: "Reach 2 million fans" }, facts)!, /money/);
+  assert.match(checkPitch({ ...base, ask: "Reach 2 million fans" }, facts)!, /count/);
+  assert.match(checkPitch({ ...base, ask: "Nike has agreed to sponsor the Tokyo show" }, facts)!, /agreed/);
   assert.equal(checkPitch({ ...base, headline: "A 7-city run" }, facts), undefined);
   const us = WORLD_CITIES.filter((c) => c.country === "US").map((c) => ({ ...c, state: c.admin1 }));
   assert.equal(matchCity("St. Louis", us), city("St. Louis").id);

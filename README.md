@@ -121,7 +121,7 @@ flowchart LR
   - Each visitor can send 30 messages an hour, and the server answers 600 a day (`HOURLY_CHAT`, `DAILY_CHAT`), counted in the database.
 - **Models.** Every model call Afinlo makes is in one table, `MODELS` in `src/platform/tour/model.ts`.
   - All of them are GPT-6 Luna, on OpenAI's Responses API through LangChain.
-  - Each gets the reasoning effort its job needs: none for the manager; low for the route planner, venue booker and promoter; medium for the sponsor scout and the pitch writer.
+  - Each gets the least reasoning its job needs, since reasoning is billed as output: none for the manager and the summarizer; low for the assistant, route planner, venue booker, promoter, sponsor scout and pitch writer, whose text is checked in code for claims the data can't support.
   - Nothing is stored at OpenAI, and each role has its own prompt cache key.
   - A chat message costs about $0.001, measured from the exact requests the app sends.
 - **Streamed.** The chat route (`/api/tour/plan/[id]/chat`) streams each step to the page as it happens, then the reply. The steps are who was asked, each lookup and each answer.

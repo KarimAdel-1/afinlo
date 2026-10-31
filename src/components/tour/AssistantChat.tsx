@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Compass, Globe2, Handshake, ListChecks, LoaderCircle, Megaphone, Mic, MicOff, Route as RouteIcon, Send, Sparkles, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, Compass, Globe2, Handshake, ListChecks, LoaderCircle, Megaphone, Mic, MicOff, RefreshCw, Route as RouteIcon, Sprout, Users, Warehouse, type LucideIcon } from "lucide-react";
 import type { AssistantCard, AssistantEvent, AssistantMessage } from "@/core/tour/types";
 import { streamAssistant } from "./client";
 import { Mascot } from "./Mascot";
@@ -12,7 +12,7 @@ import { Mascot } from "./Mascot";
 const ACTIONS: { icon: LucideIcon; label: string; say: string; tours?: boolean }[] = [
   { icon: RouteIcon, label: "Plan a tour", say: "I want to plan a tour." },
   { icon: Globe2, label: "Where are my fans?", say: "Where in the world are my fans?" },
-  { icon: Sparkles, label: "I'm just starting out", say: "I'm a new artist without many fans yet. Can I still go on tour?" },
+  { icon: Sprout, label: "I'm just starting out", say: "I'm a new artist without many fans yet. Can I still go on tour?" },
   { icon: ListChecks, label: "What's next?", say: "What should I do next on my tours?", tours: true },
 ];
 /** Under the box: what a tour covers, each a question about how Afinlo does it. */
@@ -52,7 +52,7 @@ const noChange = () => () => {};
 export function AssistantChat({ hasTours, name }: { hasTours: boolean; name?: string }) {
   const router = useRouter();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
-  const [state, setState] = useState<{ status: "loading" | "ready" } | { status: "off"; note: string }>({ status: "loading" });
+  const [state, setState] = useState<{ status: "loading" | "ready" } | { status: "off"; note: string; retry?: boolean }>({ status: "loading" });
   const [text, setText] = useState("");
   const [steps, setSteps] = useState<string[]>();
   const [error, setError] = useState("");
@@ -67,22 +67,25 @@ export function AssistantChat({ hasTours, name }: { hasTours: boolean; name?: st
   const input = useRef<HTMLTextAreaElement>(null);
   const recognition = useRef<Dictation | null>(null);
 
+  // The conversation so far; asked again from "Try again" when it couldn't be loaded.
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/assistant")
-      .then((r) => r.json())
-      .then((body: { ready?: boolean; error?: string; messages?: AssistantMessage[] }) => {
+      .then(async (r) => {
+        const body = (await r.json().catch(() => ({}))) as { ready?: boolean; error?: string; messages?: AssistantMessage[] };
         if (cancelled) return;
+        if (!r.ok) return setState({ status: "off", note: "The assistant couldn't load your conversation.", retry: true });
         if (!body.ready) return setState({ status: "off", note: body.error ?? "The assistant isn't available right now." });
         setMessages(body.messages ?? []);
         setState({ status: "ready" });
       })
-      .catch(() => !cancelled && setState({ status: "off", note: "The assistant couldn't be reached. Please reload the page." }));
+      .catch(() => !cancelled && setState({ status: "off", note: "The assistant couldn't be reached.", retry: true }));
     return () => {
       cancelled = true;
-      recognition.current?.stop();
     };
-  }, []);
+  }, [attempt]);
+  useEffect(() => () => recognition.current?.stop(), []);
 
   useEffect(() => {
     if (messages.length || steps) end.current?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -150,15 +153,15 @@ export function AssistantChat({ hasTours, name }: { hasTours: boolean; name?: st
   );
 
   const ready = state.status === "ready";
-  const fresh = ready && !messages.length && !steps;
+  // The welcome (greeting, mascot, topics) stays until the conversation starts, loaded or not.
+  const fresh = !messages.length && !steps;
   const first = name?.trim().split(/\s+/)[0];
   const actions = ACTIONS.filter((a) => !a.tours || hasTours);
   return (
     <section className={`hl-assist${fresh ? " fresh" : ""}`} aria-labelledby="hl-assist-title">
       <div className="hl-assist-hero">
         <h1 id="hl-assist-title">
-          <span>Hi {first ?? "there"},</span> ready to plan
-          <br />
+          <span>Hi {first ?? "there"},</span> ready to plan <br />
           your next tour?
         </h1>
       </div>
@@ -166,15 +169,24 @@ export function AssistantChat({ hasTours, name }: { hasTours: boolean; name?: st
       {fresh && (
         <div className="hl-assist-stage">
           {BUBBLES.map((b, i) => (
-            <button key={b} type="button" className={`hl-assist-bubble b${i + 1}`} onClick={() => void send(b)}>
-              <Sparkles size={14} aria-hidden /> {b}
+            <button key={b} type="button" className={`hl-assist-bubble b${i + 1}`} disabled={!ready} onClick={() => void send(b)}>
+              {b}
             </button>
           ))}
           <Mascot />
         </div>
       )}
 
-      {state.status === "off" && <p className="hl-note">{state.note}</p>}
+      {state.status === "off" && (
+        <p className="hl-note">
+          {state.note}{" "}
+          {state.retry && (
+            <button type="button" className="hl-linkish" onClick={() => (setState({ status: "loading" }), setAttempt((n) => n + 1))}>
+              <RefreshCw size={14} aria-hidden /> Try again
+            </button>
+          )}
+        </p>
+      )}
 
       {(!!messages.length || steps) && (
         <div className="hl-assist-log" role="log" aria-live="polite">
@@ -217,7 +229,7 @@ export function AssistantChat({ hasTours, name }: { hasTours: boolean; name?: st
       >
         <div className="hl-assist-box-top">
           <span>
-            <Sparkles size={16} aria-hidden /> Powered by Qloo&apos;s taste data: where an act&apos;s fans really are
+            Powered by Qloo&apos;s taste data: where an act&apos;s fans really are
           </span>
           <Link href="/plan" className="hl-assist-box-link">
             Prefer a form? <ArrowRight size={14} aria-hidden />
@@ -225,7 +237,6 @@ export function AssistantChat({ hasTours, name }: { hasTours: boolean; name?: st
         </div>
         <div className="hl-assist-box-main">
           <div className="hl-assist-input">
-            <Sparkles size={18} className="hl-assist-input-icon" aria-hidden />
             <label htmlFor="hl-assist-input" className="hl-visually-hidden">
               A message to Afinlo
             </label>
@@ -273,7 +284,7 @@ export function AssistantChat({ hasTours, name }: { hasTours: boolean; name?: st
                 </button>
               )}
               <button type="submit" className="hl-assist-go" disabled={!ready || !!steps || !text.trim()} aria-label="Send">
-                {steps ? <LoaderCircle size={18} className="hl-spin" aria-hidden /> : <Send size={18} aria-hidden />}
+                {steps ? <LoaderCircle size={18} className="hl-spin" aria-hidden /> : <ArrowUp size={20} aria-hidden />}
               </button>
             </div>
           </div>

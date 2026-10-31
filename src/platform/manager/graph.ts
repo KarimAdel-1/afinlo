@@ -6,9 +6,10 @@
 // and older turns fold into a running summary.
 import { Annotation, END, MessagesAnnotation, Send, START, StateGraph, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
-import { HumanMessage, isAIMessage, isHumanMessage, isToolMessage, RemoveMessage, SystemMessage, ToolMessage, type AIMessage, type BaseMessage, type ToolCall } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, isAIMessage, isHumanMessage, isToolMessage, RemoveMessage, SystemMessage, ToolMessage, type BaseMessage, type ToolCall } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { z } from "zod";
+import { withoutUnsupportedClaims } from "@/core/tour/claims";
 import { SPECIALIST_LABELS, SPECIALISTS, type ManagerCard, type Specialist } from "@/core/tour/types";
 import { data } from "../tour/model";
 import type { Desk } from "./desk";
@@ -51,6 +52,21 @@ export const textOf = (m: BaseMessage | undefined) => (!m ? "" : typeof m.conten
 export const thisTurn = (messages: BaseMessage[]) => messages.slice(Math.max(0, messages.findLastIndex((m) => isHumanMessage(m))));
 export const agentOf = (tool: string) => SPECIALISTS.find((a) => TEAM[a].handoff === tool);
 const callsOf = (m: BaseMessage | undefined) => (m && isAIMessage(m) ? ((m as AIMessage).tool_calls ?? []) : []);
+
+/**
+ * What a model reads of the conversation: the current turn in full, and earlier turns as the user's words and the
+ * replies alone, as plain text. Earlier turns' tool calls, tool results and reasoning stay in the checkpoint but aren't
+ * sent again: the replies carry what they found, and resending them would make every message cost more than the last.
+ */
+export function contextOf(messages: BaseMessage[]): BaseMessage[] {
+  const start = Math.max(0, messages.findLastIndex((m) => isHumanMessage(m)));
+  const earlier = messages.slice(0, start).flatMap((m): BaseMessage[] => {
+    if (isHumanMessage(m)) return [m];
+    const text = isAIMessage(m) && !callsOf(m).length ? textOf(m).trim() : "";
+    return text ? [new AIMessage({ id: m.id, content: text })] : [];
+  });
+  return [...earlier, ...messages.slice(start)];
+}
 
 const describe = (card: ManagerCard) =>
   card.kind === "change" ? `a change to apply (${card.summary})` : card.kind === "draft" ? `a draft ${card.draft.type === "post" ? "post" : "email"} for ${card.draft.to}` : card.text;
@@ -116,7 +132,7 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
     const last = asked >= LIMITS.asks || rounds >= LIMITS.rounds;
     const prompt = managerPrompt(desk.plan, s.summary);
     const system = new SystemMessage(last ? `${prompt}\n\nThe team has done all it can for this message: reply to the user now.` : prompt);
-    return { messages: [await (last ? reply : free).invoke([system, ...s.messages], { signal: desk.signal })] };
+    return { messages: [await (last ? reply : free).invoke([system, ...contextOf(s.messages)], { signal: desk.signal })] };
   };
 
   // The manager's tool calls, each to its node: a specialist, or the manager's own tools. No calls: the reply is done.
@@ -166,9 +182,16 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
     return { messages: [new ToolMessage({ tool_call_id: call.id!, name: call.name, content, status: "error" })] };
   };
 
+  // The reply as the user sees it: what the team made, and the reply itself without any sentence claiming what the
+  // data can't support (money, audience or sales counts, someone having agreed).
   const collect = (s: State) => {
     const turn = s.messages.findLast((m) => isHumanMessage(m))?.id ?? "";
-    return desk.made.length ? { cards: desk.made.map(({ card }) => ({ ...card, turn })) } : {};
+    const reply = s.messages.at(-1);
+    const checked = withoutUnsupportedClaims(textOf(reply));
+    return {
+      ...(desk.made.length ? { cards: desk.made.map(({ card }) => ({ ...card, turn })) } : {}),
+      ...(checked.removed && reply?.id ? { messages: [new AIMessage({ id: reply.id, content: checked.text })] } : {}),
+    };
   };
 
   const graph = new StateGraph(ManagerState)

@@ -29,7 +29,7 @@ import { locationOf } from "@/core/tour/world";
 import { brands as qlooBrands, heatCells } from "../tour/qloo";
 import { data } from "../tour/model";
 import { rememberAct, setTrack } from "../tour/tracker";
-import { MONEY } from "../tour/writer";
+import { unsupportedClaim } from "@/core/tour/claims";
 import { areaCityNamed, brandNamed, cardId, cityNamed, guideFor, named, routeOf, type Desk } from "./desk";
 
 /** How many tool calls the whole team may make for one message. */
@@ -144,8 +144,9 @@ function saveDraft(desk: Desk, agent: Specialist, type: AgentDraft["type"]) {
           type === "pitch" ? `${d.to} isn't one of this tour's brands: pitch a sponsor from sponsor_list, or a brand found with more_brands.` : type === "hold" ? `${d.to} isn't a venue you've looked up: find it with stop_venues first.` : `${d.to} isn't a stop on this tour.`,
         );
       const text = `${d.subject ?? ""}\n${d.body}`;
-      const money = text.match(MONEY);
-      if (money) return `Refused: it has a money figure or percentage ("${money[0]}"). Drafts never state fees, prices or numbers the tour's data doesn't have. Rewrite it without and save again.`;
+      const claim = unsupportedClaim(text);
+      if (claim)
+        return `Refused: it has ${claim}. Drafts never state fees, prices, audience or sales numbers, or that anyone has agreed to anything: the tour's data has none of these. Rewrite it without and save again.`;
       if (/<\/?data\b/i.test(text)) return "Refused: it quotes a data block. Write it in plain words and save again.";
       if (type !== "post" && !d.subject?.trim()) return "Refused: an email needs a subject line. Add one and save again.";
       const max = type === "post" ? 700 : 1800;

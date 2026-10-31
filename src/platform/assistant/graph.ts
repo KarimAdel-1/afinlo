@@ -3,10 +3,11 @@
 // checkpointed per browser; a turn cut short is mended before the next, and only the latest turns go to the model.
 import { Annotation, END, MessagesAnnotation, START, StateGraph, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
-import { isAIMessage, isHumanMessage, isToolMessage, RemoveMessage, SystemMessage, type AIMessage, type BaseMessage } from "@langchain/core/messages";
+import { AIMessage, isAIMessage, isHumanMessage, isToolMessage, RemoveMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { withoutUnsupportedClaims } from "@/core/tour/claims";
 import type { AssistantCard } from "@/core/tour/types";
-import { thisTurn } from "../manager/graph";
+import { contextOf, textOf, thisTurn } from "../manager/graph";
 import { data, DATA_RULE } from "../tour/model";
 import { assistantTools, type AssistantDesk } from "./tools";
 
@@ -62,17 +63,24 @@ export function assistantGraph(desk: AssistantDesk, model: BaseChatModel, checkp
 
   const think = async (s: State) => {
     const last = thisTurn(s.messages).filter((m) => isAIMessage(m)).length >= ASSISTANT_LIMITS.steps - 1;
-    // The latest turns only, cut where a turn starts, so no tool call is parted from its answer.
+    // The latest turns only, cut where a turn starts, so no tool call is parted from its answer; of the earlier ones,
+    // only what was said (contextOf).
     const starts = s.messages.flatMap((m, i) => (isHumanMessage(m) ? [i] : []));
-    const recent = s.messages.slice(starts.length > ASSISTANT_LIMITS.keep ? starts[starts.length - ASSISTANT_LIMITS.keep] : 0);
+    const recent = contextOf(s.messages.slice(starts.length > ASSISTANT_LIMITS.keep ? starts[starts.length - ASSISTANT_LIMITS.keep] : 0));
     const prompt = assistantPrompt(desk);
     const system = new SystemMessage(last ? `${prompt}\n\nYou've done all the lookups this message allows: answer now from what you found.` : prompt);
     return { messages: [await (last ? answer : free).invoke([system, ...recent], { signal: desk.signal })] };
   };
 
+  // The tours it made, and the reply without any sentence claiming what the data can't support.
   const collect = (s: State) => {
     const turn = s.messages.findLast((m) => isHumanMessage(m))?.id ?? "";
-    return desk.made.length ? { cards: desk.made.map((card) => ({ ...card, turn })) } : {};
+    const reply = s.messages.at(-1);
+    const checked = withoutUnsupportedClaims(textOf(reply));
+    return {
+      ...(desk.made.length ? { cards: desk.made.map((card) => ({ ...card, turn })) } : {}),
+      ...(checked.removed && reply?.id ? { messages: [new AIMessage({ id: reply.id, content: checked.text })] } : {}),
+    };
   };
 
   return new StateGraph(AssistantState)

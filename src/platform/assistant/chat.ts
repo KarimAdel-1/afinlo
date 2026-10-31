@@ -10,6 +10,7 @@ import type { QlooClient } from "../taste/qloo";
 import { checkpointer } from "../manager/chat";
 import { textOf, thisTurn } from "../manager/graph";
 import { openAiModels } from "../manager/models";
+import { usageMeter } from "../manager/usage";
 import { qlooClient } from "../tour/qloo";
 import { savedResults } from "../tour/saved";
 import type { Writer } from "../tour/writer";
@@ -43,12 +44,18 @@ export async function askAssistant(
     made: [] as AssistantCard[],
     toolCalls: 0,
   };
-  const graph = assistantGraph(desk, deps.model ?? openAiModels()("assistant"), deps.checkpointer ?? (await checkpointer()));
-  const out = await graph.invoke(
-    { messages: [new HumanMessage({ content: input.message, id: randomUUID() })] },
-    { configurable: { thread_id: threadOf(input.browser) }, signal: input.signal, recursionLimit: 30 },
-  );
-  return { reply: textOf(thisTurn(out.messages).at(-1)), cards: desk.made };
+  // Every model call's tokens, logged and kept once the message is done, answered or not.
+  const meter = usageMeter("assistant", input.browser);
+  const graph = assistantGraph(desk, deps.model ?? openAiModels(meter.add)("assistant"), deps.checkpointer ?? (await checkpointer()));
+  try {
+    const out = await graph.invoke(
+      { messages: [new HumanMessage({ content: input.message, id: randomUUID() })] },
+      { configurable: { thread_id: threadOf(input.browser) }, signal: input.signal, recursionLimit: 30 },
+    );
+    return { reply: textOf(thisTurn(out.messages).at(-1)), cards: desk.made };
+  } finally {
+    await meter.save();
+  }
 }
 
 /** The conversation as the page shows it: the user's messages and the assistant's replies, each with its tours. */

@@ -290,10 +290,7 @@
   box-shadow: 0 16px 34px -22px rgba(36, 32, 67, 0.45);
   animation: hl-float 6s ease-in-out infinite;
 }
-.hl-assist-bubble svg {
-  color: var(--hl-blue);
-}
-.hl-assist-bubble:hover {
+.hl-assist-bubble:hover:not(:disabled) {
   border-color: #c9c5ff;
 }
 .hl-assist-bubble.b1 {
@@ -355,9 +352,6 @@
   align-items: center;
   gap: 8px;
 }
-.hl-assist-box-top > span svg {
-  color: var(--hl-blue);
-}
 .hl-assist-box-link {
   display: inline-flex;
   align-items: center;
@@ -381,11 +375,6 @@
   display: flex;
   gap: 10px;
   padding: 16px 18px 6px;
-}
-.hl-assist-input-icon {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--hl-blue);
 }
 .hl-assist-input textarea {
   flex: 1;

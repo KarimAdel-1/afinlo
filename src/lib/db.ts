@@ -37,6 +37,11 @@ const TABLES = [
      visitor TEXT NOT NULL, act_id TEXT NOT NULL, act TEXT NOT NULL, prefs TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (visitor, act_id)
    )`,
   `CREATE TABLE IF NOT EXISTS tour_profiles (visitor TEXT PRIMARY KEY, profile TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+  // What each request spent on the model, one row per role it used (src/platform/manager/usage.ts).
+  `CREATE TABLE IF NOT EXISTS tour_model_usage (
+     at TEXT NOT NULL, surface TEXT NOT NULL, visitor TEXT, role TEXT NOT NULL, model TEXT NOT NULL,
+     calls INTEGER NOT NULL, input INTEGER NOT NULL, cached INTEGER NOT NULL, output INTEGER NOT NULL, cost_usd DOUBLE PRECISION NOT NULL
+   )`,
 ];
 const NAMES = TABLES.flatMap((sql) => sql.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)?.[1] ?? []);
 

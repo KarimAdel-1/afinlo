@@ -266,3 +266,34 @@ test("a turn cut short leaves no broken messages: its unanswered handoffs are dr
   const out = await ask(plan, "Are you there?", { manager }, { browser, saver });
   assert.equal(out.reply, "Back again.");
 });
+
+test("earlier turns reach the model as words and replies only, and a reply's unsupported claims are left out", async () => {
+  const plan = await tour();
+  const stop = stopOf(plan, 1);
+  const browser = testBrowser();
+  const saver = new MemorySaver();
+  const manager = new ScriptedModel(
+    [
+      calls(["ask_route_planner", { task: `Why is ${stop.name} on the route?` }]),
+      () => `${stop.name} is stop 2. Nike has agreed to sponsor it.`,
+      (messages) => {
+        // The first turn's handoff and the planner's answer aren't sent again: only what was said.
+        assert.equal(messages.filter((m) => isToolMessage(m)).length, 0);
+        assert.equal(messages.filter((m) => isAIMessage(m) && (m as AIMessage).tool_calls?.length).length, 0);
+        assert.deepEqual(messages.slice(1).map((m) => (isHumanMessage(m) ? "user" : "ai")), ["user", "ai", "user"]);
+        return "Glad to help.";
+      },
+    ],
+    "manager",
+  );
+  const route = new ScriptedModel([() => `${stop.name} is stop 2.`], "route");
+  const first = await ask(plan, `Why ${stop.name}?`, { manager, route }, { browser, saver });
+  assert.equal(first.reply, `${stop.name} is stop 2.\n\n(I left out a figure or claim that Qloo's data doesn't support.)`);
+  const second = await ask(plan, "Thanks!", { manager }, { browser, saver });
+  assert.equal(second.reply, "Glad to help.");
+  // What the page shows is the reply as it was checked.
+  const { messages: history } = await managerHistory(plan, browser, { checkpointer: saver });
+  assert.match(history[1].text, /left out a figure/);
+  assert.doesNotMatch(history[1].text, /Nike/);
+  assert.equal(manager.left + route.left, 0);
+});

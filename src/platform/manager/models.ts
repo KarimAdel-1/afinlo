@@ -8,16 +8,11 @@ import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import { setting } from "@/lib/settings";
 import { MODELS } from "../tour/model";
 import type { Models, Role } from "./graph";
+import type { Usage } from "./usage";
 
 /** The most each role writes in one call, its reasoning included. */
 const MAX_TOKENS: Record<Role, number> = { manager: 1500, route: 2000, venues: 2000, sponsors: 4000, promoter: 3000, summary: 600, assistant: 2500 };
 
-/** Tokens one model call used: in (of them, served from OpenAI's cache) and out (reasoning included). */
-export interface Usage {
-  input: number;
-  cached: number;
-  output: number;
-}
 
 export function openAiModels(onUsage?: (role: Role, usage: Usage) => void): Models {
   const made = new Map<Role, BaseChatModel>();

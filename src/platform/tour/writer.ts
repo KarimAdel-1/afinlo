@@ -3,6 +3,7 @@
 // sends the plan to the plain template instead. (Changes to a tour are the tour team's: src/platform/manager.)
 import { z } from "zod";
 import { setting } from "@/lib/settings";
+import { unsupportedClaim } from "@/core/tour/claims";
 import { placeOf } from "@/core/tour/regions";
 import type { CityHeat, Plan, PitchPack } from "@/core/tour/types";
 import { askJson, data, DATA_RULE, MODELS } from "./model";
@@ -21,14 +22,18 @@ const pitchSchema = z
   })
   .strict();
 
+/**
+ * The audience in a sentence. Qloo's demographics are skews against its average audience, not shares: "skewing male"
+ * says more men than usual, not more men than women, so they're described that way.
+ */
 const audienceLine = (f: WriterFacts) => {
   const d = f.fanDna.demographics;
   const age = d ? [...d.age].sort((a, b) => b.skew - a.skew)[0] : undefined;
-  const lean = d ? (d.gender.male > 0.1 ? "leans male" : d.gender.female > 0.1 ? "leans female" : "is evenly split") : "";
+  const lean = d ? (d.gender.male > 0.1 ? "male" : d.gender.female > 0.1 ? "female" : "") : "";
+  const skews = [age && age.skew > 0 ? age.band : "", lean].filter(Boolean);
   return [
     f.fanDna.tags.length ? `Fans who love ${f.fanDna.tags.slice(0, 3).map((t) => t.name.toLowerCase()).join(", ")}` : `${f.act.name}'s audience`,
-    age && age.skew > 0 ? `skewing ${age.band}` : "",
-    lean ? `and the audience ${lean}` : "",
+    skews.length ? `skewing ${skews.join(" and ")} against Qloo's average audience` : "",
   ]
     .filter(Boolean)
     .join(", ") + ".";
@@ -39,8 +44,10 @@ export function templatePitch(f: WriterFacts): PitchPack {
   const hidden = f.route.filter((c) => c.hidden);
   const top = f.sponsors.slice(0, 3);
   const cityName = (id: string) => f.route.find((c) => c.id === id)?.name ?? "";
+  // The route as made, which can be shorter than the shows asked for.
+  const shows = f.route.length;
   return {
-    headline: `${f.act.name}: a ${f.stops}-city run built around where the fans are`,
+    headline: `${f.act.name}: a ${shows}-city run built around where the fans are`,
     audience: audienceLine(f),
     markets: hidden.length
       ? `Strongest outside the usual big markets: ${hidden.map((c) => c.name).join(", ")}. Plus ${f.route.filter((c) => !c.hidden).slice(0, 3).map((c) => c.name).join(", ")}.`
@@ -56,7 +63,7 @@ export function templatePitch(f: WriterFacts): PitchPack {
       subject: `${f.act.name} × ${s.brand.name}: tour partnership`,
       body: [
         `Hi ${s.brand.name} partnerships team,`,
-        `${f.act.name} is planning a ${f.stops}-city run. Qloo's taste data ranks ${s.brand.name} #${s.qlooRank} among the brands this audience loves${s.strongestIn.length ? `, and your own audience is strongest in ${s.strongestIn.map(cityName).filter(Boolean).join(" and ")}, both on the route` : ""}.`,
+        `${f.act.name} is planning a ${shows}-city run. Qloo's taste data ranks ${s.brand.name} #${s.qlooRank} among the brands this audience loves${s.strongestIn.length ? `, and your own audience is strongest in ${s.strongestIn.map(cityName).filter(Boolean).join(" and ")}, both on the route` : ""}.`,
         audienceLine(f),
         `Would you be open to a conversation about a partnership on this tour?`,
         `Best,`,
@@ -67,9 +74,10 @@ export function templatePitch(f: WriterFacts): PitchPack {
   };
 }
 
-export const MONEY = /[$€£]\s?\d|\d+(\.\d+)?\s?(k|m|million|thousand)\b|\d+\s?%/i;
-
-/** Rejects writer output that names IDs it wasn't given or states money or percentages the facts don't contain. */
+/**
+ * Rejects writer output that names IDs it wasn't given, or claims what the facts can't support (unsupportedClaim):
+ * money, audience or sales counts, or a brand having agreed to anything.
+ */
 export function checkPitch(p: z.infer<typeof pitchSchema>, f: WriterFacts): string | undefined {
   // City IDs are lower case (us-nashville) on worldwide plans and Qloo's upper-case UUIDs on older ones: compared either way.
   const cities = new Set(f.route.map((c) => c.id.toLowerCase()));
@@ -77,8 +85,7 @@ export function checkPitch(p: z.infer<typeof pitchSchema>, f: WriterFacts): stri
   if (p.cityNotes.some((n) => !cities.has(n.cityId.toLowerCase()))) return "a city outside the route";
   if (p.emails.some((e) => !brands.has(e.brandId.toUpperCase()))) return "a brand that isn't a top sponsor";
   const text = [p.headline, p.audience, p.markets, p.ask, p.tourBrief, ...p.cityNotes.map((n) => n.note), ...p.emails.flatMap((e) => [e.subject, e.body])].join("\n");
-  if (MONEY.test(text)) return "a money figure or percentage";
-  return undefined;
+  return unsupportedClaim(text);
 }
 
 export type Writer = (facts: WriterFacts, signal?: AbortSignal) => Promise<PitchPack>;
@@ -103,15 +110,16 @@ const openAiWriter: Writer = async (f, signal) => {
       strongestIn: s.strongestIn.map((id) => f.route.find((c) => c.id === id)?.name).filter(Boolean),
     })),
     supportActs: f.supportActs.slice(0, 3).map((s) => s.act.name),
-    stops: f.stops,
+    // The route as made: the shows asked for may not all have found a city.
+    shows: f.route.length,
   };
   const result = await askJson(
     MODELS.writer,
-    `You write the sponsor pitch pack for Afinlo, a tour and sponsorship agent. Qloo has already chosen and scored every city, brand and act; use only those, by their IDs, and only the facts given. Fan Heat is audience taste affinity, not ticket demand: never claim sales, attendance, follower counts, prices, fees or deal sizes, and use no money figures or percentages. Brands are prospects whose customers overlap with the fans; never say a brand has agreed to anything or will pay. Write plainly and specifically, like a good booking agent. One email per sponsor, addressed to its partnerships team, under 170 words, ending with a simple ask for a conversation. City notes: one short line each on why the city is on the route, using its Fan Heat and whether it's a hidden market. ${DATA_RULE} Return the requested JSON.`,
+    `You write the sponsor pitch pack for Afinlo, a tour and sponsorship agent. Qloo has already chosen and scored every city, brand and act; use only those, by their IDs, and only the facts given. Fan Heat is audience taste affinity, not ticket demand: never claim sales, attendance, follower counts, prices, fees or deal sizes, and use no money figures or percentages. Demographics are skews against Qloo's average audience, not shares of this one. Brands are prospects whose customers overlap with the fans; never say a brand has agreed to anything or will pay. Write plainly and specifically, like a good booking agent. One email per sponsor, addressed to its partnerships team, under 170 words, ending with a simple ask for a conversation. City notes: one short line each on why the city is on the route, using its Fan Heat and whether it's a hidden market. ${DATA_RULE} Return the requested JSON.`,
     data("facts", JSON.stringify(facts)),
     pitchSchema,
     "pitch_pack",
-    { maxTokens: 2600, signal },
+    { maxTokens: 2600, signal, role: "writer" },
   );
   const problem = checkPitch(result, f);
   if (problem) {

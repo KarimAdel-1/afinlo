@@ -72,7 +72,20 @@ export function cityAffinity<C extends { lat: number; lon: number; country?: str
  */
 const marketOf = (city: WorldCity, world: boolean) => Math.log(city.population * (world ? (GDP_PER_HEAD[city.country] ?? MEDIAN_GDP) : 1));
 
-const scale = (v: number, min: number, max: number) => (max > min ? (100 * (v - min)) / (max - min) : 100);
+/** Values less than this far apart, relative to the largest, don't tell candidates apart. */
+const FLAT_SPREAD = 0.05;
+/**
+ * Whether values barely differ, or there's only one: a score relative to the others then says nothing about which is
+ * stronger, so it isn't given as if it did.
+ */
+export const isFlat = (values: number[]) => {
+  if (values.length < 2) return true;
+  const max = Math.max(...values),
+    min = Math.min(...values);
+  return max - min <= FLAT_SPREAD * Math.max(Math.abs(max), 1e-9);
+};
+/** 0–100 against the others; the middle, 50, when they barely differ, rather than a 100 that would claim a lead. */
+const scale = (v: number, min: number, max: number) => (isFlat([min, max]) ? 50 : (100 * (v - min)) / (max - min));
 
 /** How many of an area's cities with data are its obvious markets: its biggest, up to 10, a third of them at most. */
 export const obviousCount = (cities: number) => Math.min(10, Math.max(1, Math.floor(cities / 3)));
@@ -95,10 +108,12 @@ export function scoreCities(cells: HeatCell[], options: { basis: "act" | "simila
   const minP = Math.min(...logs),
     maxP = Math.max(...logs);
   const biggest = new Set([...rows].sort((a, b) => b.city.population - a.city.population).slice(0, obviousCount(rows.length)).map((r) => r.city.id));
+  // Affinities that barely differ give every city the same middling heat, and low confidence: the data doesn't rank them.
+  const flat = isFlat(affinities);
   const scored = rows.map((r) => {
     const heat = Math.round(scale(r.affinity, minA, maxA));
     const size = scale(marketOf(r.city, world), minP, maxP);
-    const confidence: Confidence = options.basis === "similar" ? (r.cells >= 6 ? "medium" : "low") : r.cells >= 6 ? "high" : r.cells >= 3 ? "medium" : "low";
+    const confidence: Confidence = flat ? "low" : options.basis === "similar" ? (r.cells >= 6 ? "medium" : "low") : r.cells >= 6 ? "high" : r.cells >= 3 ? "medium" : "low";
     return {
       id: r.city.id,
       name: r.city.name,
@@ -308,7 +323,8 @@ export const TIER_WEIGHT: Record<Sponsor["tier"], number> = { household: 0.8, es
 
 /**
  * Sponsor Fit, 0–100: Qloo's affinity scaled against the other brands for this audience, times category match (only
- * brands in a requested category stay) and a brand-size weight. Duplicates by name are merged (Qloo can return the
+ * brands in a requested category stay) and a brand-size weight. It ranks how well a brand's customers overlap with the
+ * fans, among these brands: not whether the brand sponsors tours, has budget, or would say yes. Duplicates by name are merged (Qloo can return the
  * same brand twice).
  */
 export function scoreSponsors(
@@ -338,7 +354,9 @@ export function scoreSponsors(
       const tier = tierOf(b.popularity);
       // The floor keeps the least-matched brand above zero: it's still one Qloo found for this audience.
       const fit = Math.round((40 + 0.6 * scale(b.affinity, min, max)) * TIER_WEIGHT[tier]);
-      const confidence: Confidence = options.basis === "similar" ? "medium" : b.affinity >= 0.85 ? "high" : "medium";
+      // Fit compares brands for this audience: with one brand, or brands Qloo matched about equally, there's nothing to
+      // compare, so it isn't confident.
+      const confidence: Confidence = isFlat(affinities) ? "low" : options.basis === "similar" ? "medium" : b.affinity >= 0.85 ? "high" : "medium";
       return {
         brand: { id: b.id, name: b.name, type: "brand", popularity: b.popularity, image: b.image, categories: b.tags },
         affinity: b.affinity,
