@@ -1,5 +1,5 @@
 // Browser helpers for the app's own API.
-import type { AssistantCard, AssistantEvent, ManagerCard, ManagerEvent, PlanInput, Specialist, TourStage } from "@/core/tour/types";
+import type { AssistantCard, AssistantEvent, ManagerCard, ManagerEvent, PlanInput, Specialist, TourContext, TourStage } from "@/core/tour/types";
 
 export async function postJson<T>(url: string, body: object): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -58,8 +58,13 @@ export async function streamAssistant(chat: string, message: string, onEvent: (e
 }
 
 /** A message to a tour's manager, reporting what the team does as it happens. Resolves with the reply and what it made. */
-export async function streamChat(planId: string, message: string, onEvent: (e: ManagerEvent) => void): Promise<{ reply: string; agents: Specialist[]; cards: ManagerCard[] }> {
-  const res = await fetch(`/api/tour/plan/${planId}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+export async function streamChat(
+  planId: string,
+  message: string,
+  onEvent: (e: ManagerEvent) => void,
+  context?: TourContext,
+): Promise<{ reply: string; agents: Specialist[]; cards: ManagerCard[] }> {
+  const res = await fetch(`/api/tour/plan/${planId}/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, ...(context ? { context } : {}) }) });
   if (res.headers.get("content-type")?.includes("application/json")) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || "The team couldn't answer. Please try again.");
   if (!res.ok || !res.body) throw new Error("The team couldn't start. Please try again.");
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();

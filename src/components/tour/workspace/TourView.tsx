@@ -358,7 +358,7 @@ export function TourView({
           </div>
         </div>
       )}
-      <TeamChat plan={plan} actions={actions} onTrack={savedTrack} />
+      <TeamChat plan={plan} actions={actions} onTrack={savedTrack} context={{ tab, ...(stop ? { stop } : {}) }} />
       {draft && <DraftDialog draft={draft.draft} done={draft.done} onClose={() => setDraft(undefined)} />}
     </div>
   );

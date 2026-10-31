@@ -2,12 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Check, ChevronDown, ChevronUp, FileText, LoaderCircle, MessagesSquare, Route as RouteIcon, Sparkles } from "lucide-react";
-import { SPECIALIST_LABELS, type ManagerCard, type ManagerEvent, type ManagerMessage, type Plan, type Track } from "@/core/tour/types";
+import { ArrowUp, Check, ChevronDown, ChevronUp, Eye, FileText, LoaderCircle, MessagesSquare, Route as RouteIcon, Sparkles, Undo2 } from "lucide-react";
+import { SPECIALIST_LABELS, type ManagerCard, type ManagerEvent, type ManagerMessage, type Plan, type TourContext, type Track } from "@/core/tour/types";
 import { streamChat } from "../client";
 import type { TourActions } from "./TourView";
 
 const DRAFT_KIND = { pitch: "Pitch", hold: "Hold request", post: "Post" } as const;
+
+/** Whether a plan was made from this change's request: the same shows, area, start, cities and focus. */
+const sameRequest = (plan: Plan, r: Plan["request"]) => {
+  const p = plan.request;
+  const ids = (a?: string[]) => [...(a ?? [])].sort().join();
+  return p.stops === r.stops && JSON.stringify(p.where) === JSON.stringify(r.where) && p.homeCityId === r.homeCityId && p.focus === r.focus && ids(p.includeCityIds) === ids(r.includeCityIds) && ids(p.excludeCityIds) === ids(r.excludeCityIds);
+};
 
 /** A step the team is on, in words. */
 function stepOf(e: ManagerEvent) {
@@ -37,7 +44,7 @@ function suggestions(plan: Plan) {
  * send, a status as set. Closed, the bar says what the team is doing and when it has replied. The conversation is kept
  * for this browser, through every change to the tour.
  */
-export function TeamChat({ plan, actions, onTrack }: { plan: Plan; actions: TourActions; onTrack: (t: Omit<Track, "updatedAt">) => void }) {
+export function TeamChat({ plan, actions, onTrack, context }: { plan: Plan; actions: TourActions; onTrack: (t: Omit<Track, "updatedAt">) => void; context?: TourContext }) {
   const router = useRouter();
   const [messages, setMessages] = useState<ManagerMessage[]>([]);
   const [summary, setSummary] = useState("");
@@ -90,8 +97,12 @@ export function TeamChat({ plan, actions, onTrack }: { plan: Plan; actions: Tour
     setSteps([]);
     show(true);
     try {
-      const answer = await streamChat(plan.id, said, (e) => setSteps((v) => [...(v ?? []), stepOf(e)]));
+      // What's on screen goes with the message, so "draft this" or "why here?" is about what the user is looking at.
+      const answer = await streamChat(plan.id, said, (e) => setSteps((v) => [...(v ?? []), stepOf(e)]), context);
       for (const card of answer.cards) if (card.kind === "status") onTrack(card.track);
+      // The team opened a tab, or a stop, for the user: the page goes there.
+      const shown = answer.cards.findLast((c) => c.kind === "show");
+      if (shown?.kind === "show") actions.goTo(shown.tab, shown.cityId);
       setMessages((v) => [...v, { role: "assistant", text: answer.reply, agents: answer.agents, cards: answer.cards }]);
       // A draft written, or brands found, are kept with the tour: the Fund tab lists them once the page catches up.
       if (answer.cards.some((c) => c.kind === "draft") || answer.agents.includes("sponsors")) router.refresh();
@@ -123,11 +134,29 @@ export function TeamChat({ plan, actions, onTrack }: { plan: Plan; actions: Tour
             <button type="button" className="hl-button hl-button-small" onClick={() => actions.rerun(c.request)}>
               Apply
             </button>
+          ) : plan.parentId === c.request.parentId && sameRequest(plan, c.request) ? (
+            // This version is the change, applied: Undo goes back to the version it was made from, which is kept.
+            <button type="button" className="hl-button hl-button-quiet hl-button-small" onClick={() => router.push(`/tour/${c.request.parentId}`)}>
+              <Undo2 size={14} aria-hidden /> Undo
+            </button>
           ) : (
             <small className="hl-team-card-note" title="The tour has changed since. Ask again to have this change made for the version you're looking at.">
               Made for an earlier version
             </small>
           )}
+        </div>
+      );
+    if (c.kind === "show")
+      return (
+        <div key={c.id} className="hl-team-card">
+          <Eye size={16} aria-hidden />
+          <span>
+            <b>Opened for you</b>
+            <small>{c.text}</small>
+          </span>
+          <button type="button" className="hl-button hl-button-quiet hl-button-small" onClick={() => actions.goTo(c.tab, c.cityId)}>
+            Go there
+          </button>
         </div>
       );
     if (c.kind === "draft")

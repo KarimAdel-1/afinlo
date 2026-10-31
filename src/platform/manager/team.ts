@@ -1,7 +1,7 @@
 // The tour team: the manager who talks to the user, and the four specialists it hands work to, each with its own
 // prompt and tools (tools.ts) and its own model (MODELS in ../tour/model.ts). The prompts hold the rules every answer
 // keeps: only what the tools returned, Fan Heat is taste not ticket demand, no money figures, no invented names.
-import { SPECIALIST_LABELS, type Plan, type Specialist } from "@/core/tour/types";
+import { SPECIALIST_LABELS, TOUR_TAB_LABELS, type Plan, type Specialist, type TourContext } from "@/core/tour/types";
 import { DATA_RULE, data } from "../tour/model";
 import { routeOf } from "./desk";
 
@@ -47,8 +47,15 @@ export function specialistPrompt(agent: Specialist, plan: Plan) {
   return `You are the ${SPECIALIST_LABELS[agent].toLowerCase()} on Afinlo's tour team, working on ${tourLine(plan)}. The tour manager gives you a task from the user's message; do it with your tools. Your answer goes to the user as it is: write it to them, and don't mention the manager or the team. ${TEAM[agent].prompt} ${RULES}`;
 }
 
-/** The manager's system prompt: the team, how to use it, the tour at a glance, and the conversation so far. */
-export function managerPrompt(plan: Plan, summary: string) {
+/** What the user has on screen, in words: the tab, and the stop in hand when it's on the route. */
+const onScreen = (plan: Plan, context?: TourContext) => {
+  if (!context) return "";
+  const stop = context.stop && plan.route.some((r) => r.cityId === context.stop) ? routeOf(plan).find((c) => c.id === context.stop) : undefined;
+  return JSON.stringify({ tab: TOUR_TAB_LABELS[context.tab], ...(stop ? { stop: stop.name } : {}) });
+};
+
+/** The manager's system prompt: the team, how to use it, the tour at a glance, what's on screen, and the conversation so far. */
+export function managerPrompt(plan: Plan, summary: string, context?: TourContext) {
   const glance = {
     act: plan.act.name,
     area: plan.area,
@@ -65,8 +72,10 @@ export function managerPrompt(plan: Plan, summary: string) {
     "Their answers go to the user as they are. When you use your own tools too, reply from what they found, plainly and briefly, keeping their names and numbers exactly, and don't add facts they didn't give.",
     "When the user says the act won't work with a brand, a sponsor category or a city, call remember_no so its next tours leave it out, and ask the route planner or sponsor scout whether this tour should change too.",
     "For greetings or questions about Afinlo itself, answer briefly without the team.",
+    "When the user says \"this\", \"here\" or \"that stop\" without a name, they mean what's on their screen (on_screen): name it in the task. To show them a tab or a stop, use show_on_page.",
     RULES,
     data("tour", JSON.stringify(glance)),
+    context ? data("on_screen", onScreen(plan, context)) : "",
     summary ? data("earlier_in_this_conversation", summary) : "",
   ]
     .filter(Boolean)

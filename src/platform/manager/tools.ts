@@ -14,6 +14,8 @@ import {
   planInput,
   SPONSOR_CATEGORIES,
   sponsorCategory,
+  TOUR_TAB_LABELS,
+  TOUR_TABS,
   TourError,
   VENUE_LABELS,
   VENUE_STATUSES,
@@ -506,6 +508,19 @@ export function managerTools(desk: Desk): Tool[] {
         desk.memory = await rememberAct(desk.browser, p.act, change);
         keep(desk, "manager", { id: cardId(), kind: "memory", text: `${p.act.name}'s next tours leave out ${what}.` });
         return `Remembered: ${p.act.name}'s next tours leave out ${what}. This tour is unchanged unless a change is proposed and applied.`;
+      },
+    }),
+    make(desk, "manager", {
+      name: "show_on_page",
+      description: "Opens a tab of the tour on the user's screen, at a stop if one is named, when they ask to see something there (\"show me Austin's venues\" is Book at Austin). Plan is the route, Book the venues, Fund the sponsors, Promote the fans, Next up the tasks.",
+      schema: z.object({ tab: z.enum(TOUR_TABS), city: cityArg.optional() }),
+      label: ({ tab }) => `Opening ${TOUR_TAB_LABELS[tab]}`,
+      run: ({ tab, city }) => {
+        const stop = city ? cityNamed(p, city) : undefined;
+        if (city && !(stop && p.route.some((r) => r.cityId === stop.id))) throw new TourError("city", `${city} isn't a stop on this tour.`);
+        const text = `${TOUR_TAB_LABELS[tab]}${stop ? `, at ${stop.name}` : ""}`;
+        keep(desk, "manager", { id: cardId(), kind: "show", text, tab, ...(stop ? { cityId: stop.id } : {}) });
+        return `Opened ${text} on the user's screen.`;
       },
     }),
   ];

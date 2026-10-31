@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TourError, type ManagerCard, type ManagerEvent } from "@/core/tour/types";
+import { TOUR_TABS, TourError, type ManagerCard, type ManagerEvent, type TourContext } from "@/core/tour/types";
 import { setting } from "@/lib/settings";
 import { askManager, managerHistory, TurnFailed } from "@/platform/manager/chat";
 import { bodyOf, browserOf, errorResponse, forbidden, fromOurPages, knownBrowser, NO_STORE, visitorOf } from "@/platform/tour/http";
@@ -7,7 +7,10 @@ import { claimChatSlot, getPlan } from "@/platform/tour/store";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
-const Body = z.object({ message: z.string().trim().min(1).max(1000) }).strict();
+// What the user has on screen comes with the message, so "draft this" or "why here?" needs no guessing.
+const Body = z
+  .object({ message: z.string().trim().min(1).max(1000), context: z.object({ tab: z.enum(TOUR_TABS), stop: z.string().max(80).optional() }).strict().optional() })
+  .strict();
 const NEEDS_KEY = "The tour team needs an OpenAI API key, which isn't set on this server yet. Everything else in the tour works without it.";
 
 /** The tour's conversation with its manager so far, for this browser. */
@@ -32,11 +35,11 @@ export async function GET(request: Request, { params }: RouteContext<"/api/tour/
  */
 export async function POST(request: Request, { params }: RouteContext<"/api/tour/plan/[id]/chat">) {
   if (!fromOurPages(request)) return forbidden();
-  let plan, browser: string, message: string;
+  let plan, browser: string, message: string, context: TourContext | undefined;
   try {
     const parsed = Body.safeParse(await bodyOf(request, 2000));
     if (!parsed.success) throw new TourError("validation", "Write a message to the team.");
-    message = parsed.data.message;
+    ({ message, context } = parsed.data);
     plan = await getPlan((await params).id);
     if (!plan) throw new TourError("plan_missing", "That tour doesn't exist.", 404);
     if (!setting("OPENAI_API_KEY")) throw new TourError("openai_not_configured", NEEDS_KEY, 503);
@@ -51,7 +54,7 @@ export async function POST(request: Request, { params }: RouteContext<"/api/tour
     async start(controller) {
       const send = (line: { event?: ManagerEvent; reply?: unknown; error?: string; cards?: ManagerCard[] }) => controller.enqueue(encoder.encode(JSON.stringify(line) + "\n"));
       try {
-        const answer = await askManager({ plan, browser, message, signal, emit: (event) => send({ event }) });
+        const answer = await askManager({ plan, browser, message, context, signal, emit: (event) => send({ event }) });
         send({ reply: answer });
       } catch (error) {
         // What the team saved before the reply failed stays saved, and the user is told so, with it shown.

@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MemorySaver } from "@langchain/langgraph";
 import { isAIMessage, isHumanMessage, isToolMessage, type AIMessage, type BaseMessage } from "@langchain/core/messages";
-import type { ManagerEvent, Plan } from "@/core/tour/types";
+import type { ManagerEvent, Plan, TourContext } from "@/core/tour/types";
 import { testBrowser, testDatabase } from "@/testing/database";
 import { ACT, fixtureQloo } from "@/testing/qloo";
 import { calls, ScriptedModel } from "@/testing/scripted";
@@ -28,10 +28,15 @@ async function tour(): Promise<Plan> {
   return { ...made, id: `pl_test_${Math.random().toString(36).slice(2, 10)}` };
 }
 
-async function ask(plan: Plan, message: string, scripts: Partial<Record<Role, ScriptedModel>>, options: { browser?: string; saver?: MemorySaver; signal?: AbortSignal } = {}) {
+async function ask(
+  plan: Plan,
+  message: string,
+  scripts: Partial<Record<Role, ScriptedModel>>,
+  options: { browser?: string; saver?: MemorySaver; signal?: AbortSignal; context?: TourContext } = {},
+) {
   const events: ManagerEvent[] = [];
   const out = await askManager(
-    { plan, browser: options.browser ?? testBrowser(), message, signal: options.signal ?? AbortSignal.timeout(30_000), emit: (e) => events.push(e) },
+    { plan, browser: options.browser ?? testBrowser(), message, context: options.context, signal: options.signal ?? AbortSignal.timeout(30_000), emit: (e) => events.push(e) },
     { models: (role) => scripts[role] ?? new ScriptedModel([], role), checkpointer: options.saver ?? new MemorySaver(), client: fixtureQloo() },
   );
   return { ...out, events };
@@ -339,4 +344,18 @@ test("a brand found for the tour in one message can be pitched in the next, and 
   const kept = await draftsFor(browser, tourId);
   assert.deepEqual(kept.map((d) => [d.draft.to, d.planId]), [["Found Later Co", plan.id]], "kept with the tour and the version it was written for");
   assert.equal((await prospectsFor(browser, tourId))[0].name, "Found Later Co");
+});
+
+test("what's on screen comes with the message, and the manager can open a tab and stop for the user", async () => {
+  const plan = await tour();
+  const stop = stopOf(plan, 1);
+  const manager = new ScriptedModel([
+    (m) => {
+      assert.match(String(m[0].content), new RegExp(`<data source="on_screen"[^>]*>\\n\\{"tab":"Book","stop":"${stop.name}"\\}`), "the tab and stop in hand reach the manager");
+      return calls(["show_on_page", { tab: "promote", city: stop.name }]);
+    },
+    `Here are ${stop.name}'s fans.`,
+  ]);
+  const out = await ask(plan, "Show me who the fans are here", { manager }, { context: { tab: "book", stop: stop.id } });
+  assert.deepEqual(out.cards.map((c) => (c.kind === "show" ? [c.tab, c.cityId] : c.kind)), [["promote", stop.id]]);
 });

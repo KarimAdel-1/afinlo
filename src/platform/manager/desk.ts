@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { citiesIn } from "@/core/tour/world";
 import { US } from "@/core/tour/regions";
-import type { ActMemory, CityGuide, CityHeat, ManagerCard, ManagerEvent, Plan, Specialist, Sponsor, Track } from "@/core/tour/types";
+import type { ActMemory, CityGuide, CityHeat, ManagerCard, ManagerEvent, Plan, Specialist, Sponsor, TourContext, Track } from "@/core/tour/types";
 import type { QlooClient } from "../taste/qloo";
 import { makeCityGuide } from "../tour/city";
 import { getCityGuide, saveCityGuide } from "../tour/store";
@@ -36,10 +36,12 @@ export interface Desk {
   toolCalls: number;
   found: Map<string, FoundBrand>;
   guides: Map<string, CityGuide>;
+  /** What the user has on screen as they send the message: the tab, and the stop in hand. */
+  context?: TourContext;
 }
 
 /** The turn's desk; `found` is what the team found for the tour in earlier messages (kept in tour_prospects), to pitch now. */
-export function openDesk(input: Pick<Desk, "plan" | "browser" | "tracks" | "memory" | "client" | "signal" | "emit"> & { found?: FoundBrand[] }): Desk {
+export function openDesk(input: Pick<Desk, "plan" | "browser" | "tracks" | "memory" | "client" | "signal" | "emit" | "context"> & { found?: FoundBrand[] }): Desk {
   const { found = [], ...rest } = input;
   return { ...rest, tourId: tourOf(input.plan), made: [], toolCalls: 0, found: new Map(found.map((b) => [b.id, b])), guides: new Map() };
 }

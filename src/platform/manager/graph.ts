@@ -161,7 +161,7 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
     const asked = turn.filter((m) => isToolMessage(m) && agentOf(m.name ?? "")).length;
     const rounds = turn.filter((m) => callsOf(m).length).length;
     const last = asked >= LIMITS.asks || rounds >= LIMITS.rounds;
-    const prompt = managerPrompt(desk.plan, s.summary);
+    const prompt = managerPrompt(desk.plan, s.summary, desk.context);
     const system = new SystemMessage(last ? `${prompt}\n\nThe team has done all it can for this message: reply to the user now.` : prompt);
     return { messages: [await (last ? reply : free).invoke([system, ...contextOf(s.messages)], { signal: desk.signal })] };
   };

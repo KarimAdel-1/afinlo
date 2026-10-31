@@ -7,7 +7,7 @@ import type { BaseCheckpointSaver } from "@langchain/langgraph";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { db } from "@/lib/db";
 import { setting } from "@/lib/settings";
-import type { ManagerCard, ManagerEvent, ManagerMessage, Plan, Specialist } from "@/core/tour/types";
+import type { ManagerCard, ManagerEvent, ManagerMessage, Plan, Specialist, TourContext } from "@/core/tour/types";
 import type { QlooClient } from "../taste/qloo";
 import { qlooClient } from "../tour/qloo";
 import { prospectsFor } from "../tour/work";
@@ -62,14 +62,14 @@ export class TurnFailed extends Error {
 
 /** One message to the tour's manager: the reply, the specialists it asked, and what they made for the user. */
 export async function askManager(
-  input: { plan: Plan; browser: string; message: string; signal: AbortSignal; emit?: (event: ManagerEvent) => void },
+  input: { plan: Plan; browser: string; message: string; context?: TourContext; signal: AbortSignal; emit?: (event: ManagerEvent) => void },
   deps: ManagerDeps = {},
 ): Promise<{ reply: string; agents: Specialist[]; cards: ManagerCard[] }> {
   const { plan, browser } = input;
   const tourId = tourOf(plan);
   // The brands the team found for this tour in earlier messages come back, so they can be pitched now.
   const [tracks, memory, found] = await Promise.all([tracksFor(browser, [tourId]).then((t) => t.get(tourId) ?? []), actMemory(browser, plan.act.id), prospectsFor(browser, tourId)]);
-  const desk = openDesk({ plan, browser, tracks, memory, found, client: deps.client ?? qlooClient(), signal: input.signal, emit: input.emit ?? (() => {}) });
+  const desk = openDesk({ plan, browser, tracks, memory, found, context: input.context, client: deps.client ?? qlooClient(), signal: input.signal, emit: input.emit ?? (() => {}) });
   // Every model call's tokens, by role, logged and kept once the message is done, answered or not.
   const meter = usageMeter("tour", browser);
   const graph = managerGraph(desk, deps.models ?? openAiModels(meter.add), deps.checkpointer ?? (await checkpointer()));
