@@ -17,10 +17,10 @@ export const metadata: Metadata = {
 
 const FAQ = [
   ["Is Fan Heat the same as ticket demand?", "No. Fan Heat is audience taste affinity: where people who love this act over-index, according to Qloo. It's a better starting point for routing and sponsor outreach, which a promoter still validates with ticketing data."],
-  ["Where does the data come from?", "Every act, city, brand, venue and support act comes from Qloo's Taste AI, with its Qloo ID. City sizes are Natural Earth metro estimates. Afinlo's own code scores the results; the language model only writes the pitch."],
+  ["Where does the data come from?", "Every act, brand, venue and support act comes from Qloo's Taste AI, with its Qloo ID, and where an act's fans are comes from Qloo's heatmap. The cities themselves, and their sizes, are Natural Earth's. Afinlo's own code scores the results; the language model only writes the pitch."],
   ["Does Afinlo use personal data?", "No. Qloo's data is aggregate taste data about audiences, never about individuals, and Afinlo doesn't ask for or store personal information. There's no sign-in."],
   ["What if Qloo knows little about an act?", "Afinlo says so. When an act has no location data of its own, the plan is estimated from acts with overlapping audiences and labelled that way. When there's nothing to go on, it says it can't tell rather than guessing."],
-  ["Why not just ask a chatbot?", "A chatbot has no data on where a particular act's fans are, so it tends to name the biggest cities and the best-known brands. Afinlo asks Qloo, which knows what each act's audience loves and where it over-indexes: every city, venue and brand in a tour carries the Qloo ID it came from."],
+  ["Why not just ask a chatbot?", "A chatbot has no data on where a particular act's fans are, so it tends to name the biggest cities and the best-known brands. Afinlo asks Qloo, which knows what each act's audience loves and where it over-indexes: every venue and brand in a tour carries the Qloo ID it came from, and every city's Fan Heat comes from Qloo's heatmap."],
   ["Can a brand say yes to a pitch?", "Afinlo finds brands whose customers are these fans and drafts the outreach. It doesn't claim a brand will sponsor, and it never sends anything for you."],
 ] as const;
 

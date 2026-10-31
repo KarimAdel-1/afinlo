@@ -90,6 +90,7 @@
 }
 .hl-dock-icon.white {
   background: linear-gradient(180deg, #ffffff 0%, #ededf3 100%);
+  color: var(--af2-blue);
 }
 .hl-dock-icon.blue {
   background: linear-gradient(160deg, #7a72ff 0%, #4336ff 52%, #2b1fd9 100%);

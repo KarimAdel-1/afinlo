@@ -326,9 +326,9 @@ export function TourView({
               <span className="hl-map-key-sep" />
             </>
           )}
-          <span className="hl-map-key-heat">Fewer fans</span>
+          <span className="hl-map-key-heat">Lower Fan Heat</span>
           <span className="hl-map-key-grad" />
-          <span className="hl-map-key-heat">More fans</span>
+          <span className="hl-map-key-heat">Higher Fan Heat</span>
           <span className="hl-map-key-sep" />
           <span className="hl-pin mini">1</span> Stop
           <span className="hl-pin mini lime">2</span> Hidden market

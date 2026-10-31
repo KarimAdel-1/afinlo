@@ -76,7 +76,7 @@ export default async function DoesItWork() {
           <h2>Without Qloo, there is no plan.</h2>
         </div>
         <div>
-          <p className="af2-big-copy">Every city, brand, venue and support act in a plan comes from a Qloo response, with its Qloo ID.</p>
+          <p className="af2-big-copy">Every brand, venue and support act in a plan comes from a Qloo response, with its Qloo ID, and every city&apos;s Fan Heat from Qloo&apos;s heatmap.</p>
           <p>
             Each plan lists the requests behind it. If Qloo doesn&apos;t answer, Afinlo shows no cities or sponsors rather than asking the language model to fill in.
             The model only writes the pitch from what Qloo returned, and its draft is checked against the plan.

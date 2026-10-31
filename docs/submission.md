@@ -27,7 +27,7 @@ Afinlo is an AI tour manager that knows your fans. Tell it which artist or comed
 
 ## Why it only works with Qloo
 
-Every city, venue, brand and act in a tour comes from Qloo, with its Qloo ID, and every tour lists its Qloo requests under Receipts: 20–30 per tour, plus 6–8 for each stop opened. Afinlo uses Qloo's search; heatmaps of the world, a region or chosen countries; taste tags and demographics; and brand, artist and place insights filtered by location and compare. Plain code scores the answers, so the same Qloo answers always give the same plan. Without Qloo there is no tour: a failed request shows as failed, and nothing is invented.
+Every venue, brand and act in a tour comes from Qloo, with its Qloo ID, and every city's Fan Heat from Qloo's heatmap (the cities themselves are Natural Earth's), and every tour lists its Qloo requests under Receipts: 20–30 per tour, plus 6–8 for each stop opened. Afinlo uses Qloo's search; heatmaps of the world, a region or chosen countries; taste tags and demographics; and brand, artist and place insights filtered by location and compare. Plain code scores the answers, so the same Qloo answers always give the same plan. Without Qloo there is no tour: a failed request shows as failed, and nothing is invented.
 
 [Backtest result, when measured: "Against public listener-city data for N acts, X% of each act's real top-5 cities were in Afinlo's top 10, versus Y% for the biggest cities." Method on the Does it work? page.]
 

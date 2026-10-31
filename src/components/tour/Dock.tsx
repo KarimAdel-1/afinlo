@@ -19,7 +19,7 @@ interface Page {
 const GROUPS: Page[][] = [
   [
     { label: "Home", href: "/home", icon: House, tone: "blue" },
-    { label: "New tour", href: "/plan", icon: Plus, tone: "ink" },
+    { label: "New tour", href: "/plan", icon: Plus, tone: "white" },
     { label: "Acts", href: "/acts", icon: Mic2, tone: "lavender" },
   ],
 ];

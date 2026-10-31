@@ -13,7 +13,8 @@
   --hl-blue-ink: #2f22e6;
   --hl-lavender: #e4e3f8;
   /* Nothing beyond the landing page's palette: its blue for what's active, strong or done, its ink, its grays, and its
-     lavender tint for what's highlighted. Red is kept for errors alone. */
+     lavender tint for what's highlighted. Red is kept for errors alone, and the fan map's heat scale (HEAT_RAMP in
+     src/core/tour/heat.ts) runs from the blue to amber, as a heat map should. */
   --hl-tint: #e0ddfa;
   --hl-tint-ink: #2f22e6;
   --hl-strong: #262a3f;

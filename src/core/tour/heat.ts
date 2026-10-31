@@ -46,14 +46,19 @@ export function cellBox(lat: number, lon: number, grid: HeatGrid): [number, numb
 /** A cell's density on both maps: its strength (0–1) squared, so most of the map stays clear and colour gathers where the fans are. */
 export const cellDensity = (w: number) => w * w;
 
-/** Density to colour, from clear to hot, as [density, [red, green, blue, alpha]]: the landing page's blue, light to deep. */
+/**
+ * Density to colour, from clear to hot, as [density, [red, green, blue, alpha]]: a heat map's full scale, starting from
+ * Afinlo's blue, through purple and magenta to coral and amber where the fans gather most (in the spirit of the
+ * "plasma" scale, which reads in order at a glance and in greyscale).
+ */
 export const HEAT_RAMP: [number, [number, number, number, number]][] = [
   [0, [143, 134, 255, 0]],
   [0.12, [143, 134, 255, 0.32]],
-  [0.35, [98, 86, 255, 0.5]],
-  [0.6, [67, 54, 255, 0.64]],
-  [0.82, [47, 34, 230, 0.74]],
-  [1, [30, 23, 168, 0.86]],
+  [0.35, [67, 54, 255, 0.52]],
+  [0.55, [140, 40, 200, 0.62]],
+  [0.72, [214, 50, 140, 0.72]],
+  [0.87, [247, 112, 72, 0.8]],
+  [1, [252, 196, 44, 0.9]],
 ];
 
 /** The ramp's colour at a density, as the live map blends it. */

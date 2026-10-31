@@ -251,6 +251,8 @@
 }
 .hl-assist:not(.fresh) .hl-assist-log {
   flex: 1;
+  /* The messages keep their own height at the top; the room left is below them, not inside them. */
+  align-content: start;
 }
 .hl-assist:not(.fresh) .hl-assist-dock {
   position: sticky;
@@ -578,7 +580,6 @@
   gap: 8px;
   margin-left: auto;
 }
-.hl-assist-mic,
 .hl-assist-go {
   display: inline-grid;
   place-items: center;
@@ -586,14 +587,6 @@
   height: 44px;
   border: 0;
   border-radius: 50%;
-}
-.hl-assist-mic {
-  background: linear-gradient(135deg, #5b5f86, #3d4062);
-  color: #fff;
-}
-.hl-assist-mic.on {
-  background: #4336ff;
-  animation: hl-pulse 1.2s ease-in-out infinite;
 }
 .hl-assist-go {
   background: #eef0ff;
@@ -604,14 +597,8 @@
   background: var(--hl-blue);
   color: #fff;
 }
-.hl-assist-mic:disabled,
 .hl-assist-go:disabled {
   opacity: 0.6;
-}
-@keyframes hl-pulse {
-  50% {
-    box-shadow: 0 0 0 6px rgb(67 54 255 / 0.2);
-  }
 }
 .hl-assist-topics {
   display: flex;
@@ -719,8 +706,7 @@
 @media (prefers-reduced-motion: reduce) {
   .hl-mascot,
   .hl-mascot-eye,
-  .hl-assist-bubble,
-  .hl-assist-mic.on {
+  .hl-assist-bubble {
     animation: none;
   }
 }

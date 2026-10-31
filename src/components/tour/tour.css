@@ -967,7 +967,7 @@
   width: 64px;
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(90deg, rgba(143, 134, 255, 0.35), #4336ff, #3023df, #1e17a8);
+  background: linear-gradient(90deg, rgba(143, 134, 255, 0.35), #4336ff, #8c28c8, #d6328c, #f77048, #fcc42c);
 }
 .hl-map-key-sep {
   width: 1px;
@@ -1312,8 +1312,8 @@
   justify-self: end;
   padding: 10px 16px;
   border-radius: 20px 20px 6px 20px;
-  background: var(--hl-ink);
-  color: #fff;
+  background: var(--hl-tint);
+  color: var(--hl-ink);
 }
 .hl-team-msg:not(.user) {
   padding: 14px 16px;

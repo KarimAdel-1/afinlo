@@ -34,8 +34,13 @@ export function PlanTab({
         <h2 id="hl-glance-title">Why this route</h2>
         {plan.proof ? (
           <>
+            {/* Said as it came out: Fan Heat is relative affinity, not a count of fans, and the route can tie or lose. */}
             <p>
-              Its cities have more {plan.act.name} fans than a tour of the {plan.proof.biggestCities.length} biggest cities in {plan.area ?? "the area"} would.
+              {plan.proof.route > plan.proof.biggest
+                ? `On average, its cities score higher on Fan Heat for ${plan.act.name} than a tour of the ${plan.proof.biggestCities.length} biggest cities in ${plan.area ?? "the area"} would.`
+                : plan.proof.route === plan.proof.biggest
+                  ? `On average, its cities score the same on Fan Heat for ${plan.act.name} as a tour of the ${plan.proof.biggestCities.length} biggest cities in ${plan.area ?? "the area"} would.`
+                  : `On average, its cities score lower on Fan Heat for ${plan.act.name} than a tour of the ${plan.proof.biggestCities.length} biggest cities in ${plan.area ?? "the area"} would: the route also weighs spacing, travel and any cities you asked for.`}
             </p>
             <div className="hl-compare">
               <span>This route</span>
