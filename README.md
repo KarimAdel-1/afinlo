@@ -106,7 +106,7 @@ flowchart LR
 
 | Agent | Answers | Can do | Its tools |
 | --- | --- | --- | --- |
-| Manager | Which specialists a message needs, and the reply from what they found | Remembers each "no" about the act for its next tours | A hand-off to each specialist, `act_memory`, `remember_no` |
+| Manager | Which specialists a message needs (their answers are the reply), using what's on your screen | Remembers each "no" about the act for its next tours; opens a tab or stop for you | A hand-off to each specialist, `act_memory`, `remember_no`, `show_on_page` |
 | Route planner | Why a city is or isn't on the route, distances, drives and flights, hidden markets, the comparison with the biggest cities | Proposes a change: the number of shows, cities skipped or added, the start, the area (the whole world included), hidden markets first | `route_overview`, `city_details`, `cities_off_route`, `propose_change` |
 | Venue booker | The venues these fans love at each stop, and where each stands | Sets a venue's status; drafts a hold request | `route_overview`, `stop_venues`, `set_venue_status`, `save_draft` |
 | Sponsor scout | The sponsors, their fit and their evidence | Finds more brands in a category; sets a sponsor's status; drafts a pitch in any language | `route_overview`, `sponsor_list`, `more_brands`, `brand_strength`, `set_sponsor_status`, `save_draft` |
@@ -114,8 +114,10 @@ flowchart LR
 
 - **Supervisor pattern, in LangGraph.** The manager hands work out through one tool per specialist, and calls to several fan out in parallel (`Send`). Each specialist is its own small graph (`StateGraph` and `ToolNode`): a loop of thinking and looking things up, with its own prompt, tools and model. It sees only its task, so every context stays short.
 - **Grounded.** The agents see the tour and Qloo only through tools with zod schemas, and every city, brand and venue they name comes from a tool's answer. There's no vector index: the data is structured, with IDs, so the tools look things up exactly. Tool answers, Qloo's text and your words reach the model as fenced data, never as instructions.
-- **You decide.** A change is a proposal until you click Apply. The planning agent then makes a new version of the tour from Qloo's data, and statuses carry over. Drafts pass the writer's checks: no money figures, no names outside the tour.
-- **Memory.** Each tour's conversation is kept per browser in LangGraph's Postgres checkpointer, and survives a reload and every change to the tour. After ten turns, the older ones fold into a running summary. A turn cut short is repaired before the next one.
+- **You decide.** A change is a proposal until you click Apply, and once applied it can be undone. The planning agent then makes a new version of the tour from Qloo's data, and statuses carry over. Anything it can't plan around yet (no flights, dates) is shown as not applied.
+- **Checked.** Drafts, the pitch and every final reply pass one check for claims the data can't support: money, audience or sales counts, anyone having agreed (`src/core/tour/claims.ts`), and no names outside the tour.
+- **Kept.** Brands the team finds and drafts it writes are kept with the tour, listed in Fund to reopen, however long the conversation gets.
+- **Memory.** Each tour's conversation is kept per browser in LangGraph's Postgres checkpointer, and survives a reload and every change to the tour. Each model call reads only the last few messages, as what was said, never old tool results; after five turns the older ones fold into a running summary. A turn cut short is repaired before the next one.
 - **Limits.**
   - Per message: at most four specialist answers in three rounds, four steps per specialist (the last can't call tools), ten lookups across the team, and 60 seconds. A tool's error comes back to the agent as text, so it can recover.
   - Each visitor can send 30 messages an hour, and the server answers 600 a day (`HOURLY_CHAT`, `DAILY_CHAT`), counted in the database.
@@ -123,11 +125,11 @@ flowchart LR
   - All of them are GPT-6 Luna, on OpenAI's Responses API through LangChain.
   - Each gets the least reasoning its job needs, since reasoning is billed as output: none for the manager and the summarizer; low for the assistant, route planner, venue booker, promoter, sponsor scout and pitch writer, whose text is checked in code for claims the data can't support.
   - Nothing is stored at OpenAI, and each role has its own prompt cache key.
-  - A chat message costs about $0.001, measured from the exact requests the app sends.
+  - Every request logs its calls, tokens and cost by role, and keeps them in `tour_model_usage`. Tool answers reach the models as compact text, thanks and hellos need no model, and a specialist's answer is the reply without a second manager call.
 - **Streamed.** The chat route (`/api/tour/plan/[id]/chat`) streams each step to the page as it happens, then the reply. The steps are who was asked, each lookup and each answer.
 - **Tested.**
-  - Eight tests run the team against scripted models and fixture Qloo. They cover routing, a specialist seeing only its task, two at once, proposals, checked drafts, statuses and "no"s, the limits, the memory and its summary, and a turn cut short.
-  - `npm run eval` sends 21 messages across three example tours to the live model. It checks each reply for the right specialist, no city outside the tour, no money figure, and the change or draft asked for.
+  - Thirteen tests run the team against scripted models and fixture Qloo. They cover routing, a specialist seeing only its task, two at once, proposals and compound changes, checked drafts and replies, statuses and "no"s, the limits, the memory and its summary, a turn cut short, a failed reply after a save, kept brands and drafts, and what's on screen.
+  - `npm run eval` sends 21 messages across three example tours to the live model. It checks each reply and draft for the right specialist, no made-up city anywhere in the world, no unsupported claim, and the change or draft asked for, in the language asked (read from its text). Any failure, or a missing case, fails the command.
 
 ## Run it locally
 

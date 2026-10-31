@@ -305,10 +305,161 @@ These are real but small, or a change of behaviour that's yours to decide, so th
   shows what was asked.
 - **`remember_no` from the team** doesn't hide the brand in Fund until the page is reloaded (the card has no brand
   ID).
-- **Sponsor statuses for brands found with `more_brands`** are saved but shown nowhere except the chat card, since
-  Fund lists only the plan's own sponsors.
+- ~~**Sponsor statuses for brands found with `more_brands`** are saved but shown nowhere except the chat card.~~ Fixed
+  in the second review (F below): found brands are kept with the tour and listed in Fund with their status.
 
-## Files changed
+---
+
+# Second review: trust, durable work and cost
+
+An outside review (31 October, at `f4af262`) reproduced ten gaps between what Afinlo claims and what its code
+guarantees, plus weaknesses in the evaluation. Each is fixed below, with the test that covers it. Its longer-term
+roadmap is at the end, under "Not built yet".
+
+**After:** typecheck, lint and `npm test` 64 of 64 passing. No live model was called to make or check these changes.
+
+| # | Problem | Severity | Status |
+|---|---|---|---|
+| A | Generated text could state money, audience counts or agreements the data doesn't support | High | Fixed |
+| B | Flat or single results scored 100 with high confidence | High | Fixed |
+| C | Sponsors from similar acts were badged as the act's own data | High | Fixed |
+| D | Requested cities skipped spacing, could repeat, and could vanish silently | High | Fixed |
+| E | A change to another area dropped its cities and start | High | Fixed |
+| F | Found sponsors and drafts lived only in the conversation | High | Fixed |
+| G | Copy claimed more than the result showed | High | Fixed |
+| H | A failed reply said "Nothing was changed" after statuses were saved | High | Fixed |
+| I | A malformed Qloo heatmap read as "no data" | Medium | Fixed |
+| J | Straight-line distances were shown as drives | Medium | Fixed (labels); real travel times not built |
+| — | A change card from an earlier version could be applied over the current one | High | Fixed |
+| — | The evaluation couldn't fail a bad release | High | Fixed |
+| — | The backtest re-ranked a truncated city list and dropped unmatched cities | Medium | Fixed (not re-run) |
+
+## A. Unsupported claims
+
+**Fix:** one checker, [claims.ts](../src/core/tour/claims.ts), for money (signs, codes, words, percentages), audience,
+ticket and sales counts, and anyone having agreed, committed or guaranteed, in English, Spanish and French. The pitch
+writer falls back to its template when its text fails it ([writer.ts](../src/platform/tour/writer.ts)); `save_draft`
+refuses and asks for a rewrite; the tour team's and the assistant's final replies drop the offending sentence and say
+so ([graph.ts](../src/platform/manager/graph.ts), [assistant/graph.ts](../src/platform/assistant/graph.ts)). It is
+pattern-based: it catches the usual ways of saying these things, not every way.
+
+**Tests:** [claims.test.ts](../src/core/tour/claims.test.ts) (the review's own "Nike has agreed … 50000 USD … 9000
+attendees", currency codes, multilingual, and figures that must pass: Fan Heat, stops, km, ranks); the pitch check in
+[agent.test.ts](../src/platform/tour/agent.test.ts); a reply with a claim in
+[manager.test.ts](../src/platform/manager/manager.test.ts).
+
+## B. Flat scores
+
+**Fix:** values less than 5% apart, or a single result, are flat (`isFlat` in
+[scoring.ts](../src/core/tour/scoring.ts)): they score a neutral 50 with low confidence, no city is called a hidden
+market, and the plan's notes say Fan Heat (or Sponsor Fit) doesn't tell them apart. Fund explains what Sponsor Fit
+does and doesn't measure.
+
+**Test:** "flat signals don't look strong…" in [scoring.test.ts](../src/core/tour/scoring.test.ts).
+
+## C. Provenance per section
+
+**Fix:** a plan records whose data its sponsors and audience profile are from (`provenance` in
+[types.ts](../src/core/tour/types.ts)) when they widen to similar acts, independently of the map. Widened sponsors are
+never high confidence; the tour badge, Fund, Promote and the tour team say which part is estimated.
+
+## D. Requested cities
+
+**Fix:** they're played once each, and `requestedCheck` reports any that has no data, doesn't fit the shows, or sits
+closer than the spacing (kept because it was asked for). The plan also says when fewer stops fit than were asked.
+
+**Test:** "cities asked for are each played once…" in [scoring.test.ts](../src/core/tour/scoring.test.ts).
+
+## E. Compound changes
+
+**Fix:** `propose_change` resolves the area first, then the cities to add, skip and start from within it. Anything it
+can't express yet ("no flights", "weekends only") goes in `notSupported` and shows on the card as not applied.
+
+**Test:** "Move this to Europe, start in Berlin, keep six shows, and avoid flights" in
+[manager.test.ts](../src/platform/manager/manager.test.ts).
+
+## F. Durable sponsors and drafts
+
+**Fix:** [work.ts](../src/platform/tour/work.ts) keeps brands found with `more_brands` (`tour_prospects`) and every
+saved draft with the version it was written for (`tour_drafts`), per browser and tour. The next message's tools find
+them, the sponsor scout lists them, statuses can be set on them (the status route accepts them), and Fund lists both,
+marking a draft written for an earlier version.
+
+**Test:** "a brand found for the tour in one message can be pitched in the next…" in
+[manager.test.ts](../src/platform/manager/manager.test.ts).
+
+## G. Copy
+
+**Fix:** "Why this route" says higher, the same or lower on Fan Heat, as it came out; the map legend reads Fan Heat,
+not fans; Promote and the pitch describe demographics as skews against Qloo's average audience; the writer is given
+the stops actually routed; the site and submission no longer say cities have Qloo IDs (they're Natural Earth's; their
+Fan Heat is Qloo's).
+
+## H. Failure messages
+
+**Fix:** a reply that fails after something was saved throws `TurnFailed` with what was made; the chat route says what
+stays saved and sends it, and the page applies it ([chat.ts](../src/platform/manager/chat.ts),
+[TeamChat.tsx](../src/components/tour/workspace/TeamChat.tsx)).
+
+**Test:** "a reply that fails after something was saved…" in [manager.test.ts](../src/platform/manager/manager.test.ts).
+
+## I. Malformed responses
+
+**Fix:** a heatmap or entity list of the wrong shape, or cells none of which can be read, is a `qloo_contract` error
+with its trace marked, distinct from a valid empty answer ([qloo.ts](../src/platform/tour/qloo.ts)).
+
+**Test:** [qloo.test.ts](../src/platform/tour/qloo.test.ts).
+
+## J. Distances
+
+**Fix:** legs read "≈341 km, likely a drive", the header "≈2,221 km · likely 1 flight", with the straight-line basis
+explained, and the route planner is told the same. Real travel times are on the roadmap.
+
+## Old change cards
+
+**Fix:** Apply shows only on a change made for the version on screen; an older one says "Made for an earlier version".
+The version a change made offers Undo, back to the one it came from (kept, with statuses and drafts untouched).
+
+## Evaluation and backtest
+
+**Fix:** [eval-manager.mts](../scripts/eval-manager.mts) reads a draft's language from its text, looks for made-up
+cities worldwide in replies and drafts, checks every claim with claims.ts, uses the chat route's 60 seconds, enforces
+its 21 cases, keeps full cards in its output, and exits 1 on any failure. [backtest.mts](../scripts/backtest.mts)
+scores every candidate city with data, counts every recorded city (unmatched or without data is a miss, listed),
+reports coverage and the planner's own tour-score ranking, and says it tests audience geography, not itineraries.
+Neither was run for this change: both call live APIs.
+
+## Also changed in this pass
+
+- **Token use, measured:** earlier turns go to the models as the last six messages, each cut to 600 characters, with
+  no old tool results; tool answers are compact text (tables, no IDs) instead of JSON; a specialist's answer is the
+  reply, with no second manager call; thanks, bye and hello need no model; output caps are tighter and the writer and
+  sponsor scout reason less. Every request logs its calls, tokens and cost by role and keeps them in
+  `tour_model_usage` ([usage.ts](../src/platform/manager/usage.ts)).
+- **Screen-aware tour chat:** each message carries the tab and stop on screen, and `show_on_page` opens a tab or stop.
+- **Home:** the assistant alone, with History and New chat; its own bot; the dashboard in the landing page's palette.
+
+## Not built yet
+
+The review's roadmap (its sections 4–7) and the product vision describe work beyond fixing these gaps. None of it is
+built; it is listed so nothing is implied.
+
+- **Constraints the planner enforces:** date windows, rest days, target capacity, maximum travel, no flights, start
+  and end points, and scoped preferences (this tour only, or every tour). Today these are reported as not supported.
+- **Real travel:** a travel-time matrix and choosing cities and order together, not score first and order second.
+- **Evidence cards:** why each city, venue and sponsor was chosen, direct or proxy, what could change it and what's
+  unverified (venue capacity, availability, contacts).
+- **Scenarios:** audience-first, lower-travel and balanced routes compared on the same measures.
+- **Durable Tour records:** a stable tour with explicit revisions, version-checked patches with a preview of what
+  changes, revision history, and actions with IDs so a retry can't repeat one.
+- **Event timestamps and follow-ups:** first sent, followed up, replied, hold expiry; venue follow-ups in Next up.
+- **Learning from outcomes:** why suggestions were rejected, which pitches got replies, which venues worked.
+- **Operations:** versioned migrations instead of `CREATE TABLE IF NOT EXISTS`, coalescing identical Qloo requests in
+  flight, a deployment smoke test (tour, venues, chat, status, PDF), locally bundled fonts, export and recovery, and
+  sign-in and sharing beyond a browser cookie.
+- **Validation with practitioners:** managers and bookers judging which recommendations they'd act on.
+
+## Files changed (first review)
 
 - **New:** [acts.ts](../src/platform/tour/acts.ts), [acts.test.ts](../src/platform/tour/acts.test.ts),
   [store.test.ts](../src/platform/tour/store.test.ts), this file.
