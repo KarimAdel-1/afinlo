@@ -195,7 +195,7 @@
   font-weight: 800;
 }
 .deck-route li > span.lime {
-  background: var(--hl-lime);
+  background: var(--hl-tint);
   color: var(--hl-ink);
 }
 .deck-route b {

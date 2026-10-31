@@ -19,8 +19,8 @@ interface Page {
 const GROUPS: Page[][] = [
   [
     { label: "Home", href: "/home", icon: House, tone: "blue" },
-    { label: "New tour", href: "/plan", icon: Plus, tone: "orange" },
-    { label: "Acts", href: "/acts", icon: Mic2, tone: "violet" },
+    { label: "New tour", href: "/plan", icon: Plus, tone: "ink" },
+    { label: "Acts", href: "/acts", icon: Mic2, tone: "lavender" },
   ],
 ];
 /** An icon's size in the dock's units: 5 at rest, 8 under the pointer, about 7 and 6 one and two icons away, as in Osmo's dock. */

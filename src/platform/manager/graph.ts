@@ -10,6 +10,7 @@ import { AIMessage, HumanMessage, isAIMessage, isHumanMessage, isToolMessage, Re
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { z } from "zod";
 import { withoutUnsupportedClaims } from "@/core/tour/claims";
+import { courtesyOf } from "@/core/tour/courtesy";
 import { SPECIALIST_LABELS, SPECIALISTS, type ManagerCard, type Specialist } from "@/core/tour/types";
 import { data } from "../tour/model";
 import type { Desk } from "./desk";
@@ -27,9 +28,9 @@ export const LIMITS = {
   rounds: 3,
   /** Model calls a specialist makes for one task; the last answers without tools. */
   steps: 4,
-  /** Turns kept word for word once a conversation has more than `foldAt`; older ones fold into the summary. */
-  keep: 6,
-  foldAt: 10,
+  /** Turns kept once a conversation has more than `foldAt`; older ones fold into the summary. */
+  keep: 3,
+  foldAt: 5,
 };
 
 type TurnCard = ManagerCard & { turn: string };
@@ -53,19 +54,38 @@ export const thisTurn = (messages: BaseMessage[]) => messages.slice(Math.max(0, 
 export const agentOf = (tool: string) => SPECIALISTS.find((a) => TEAM[a].handoff === tool);
 const callsOf = (m: BaseMessage | undefined) => (m && isAIMessage(m) ? ((m as AIMessage).tool_calls ?? []) : []);
 
+/** How much of an earlier message a model reads again: enough to know what was asked and answered. */
+const EARLIER_CHARS = 600;
+const shortened = (text: string) => (text.length > EARLIER_CHARS ? `${text.slice(0, EARLIER_CHARS)}…` : text);
+
 /**
- * What a model reads of the conversation: the current turn in full, and earlier turns as the user's words and the
- * replies alone, as plain text. Earlier turns' tool calls, tool results and reasoning stay in the checkpoint but aren't
- * sent again: the replies carry what they found, and resending them would make every message cost more than the last.
+ * What a model reads of the conversation: the current turn in full, and the latest `earlier` messages before it as
+ * what was said, each cut to EARLIER_CHARS. Earlier turns' tool calls, tool results and reasoning stay in the
+ * checkpoint but aren't sent again: the replies carry what they found, and resending them would make every message
+ * cost more than the last.
  */
-export function contextOf(messages: BaseMessage[]): BaseMessage[] {
+export function contextOf(messages: BaseMessage[], earlier = 6): BaseMessage[] {
   const start = Math.max(0, messages.findLastIndex((m) => isHumanMessage(m)));
-  const earlier = messages.slice(0, start).flatMap((m): BaseMessage[] => {
-    if (isHumanMessage(m)) return [m];
+  const said = messages.slice(0, start).flatMap((m): BaseMessage[] => {
+    if (isHumanMessage(m)) return [new HumanMessage({ id: m.id, content: shortened(textOf(m)) })];
     const text = isAIMessage(m) && !callsOf(m).length ? textOf(m).trim() : "";
-    return text ? [new AIMessage({ id: m.id, content: text })] : [];
+    return text ? [new AIMessage({ id: m.id, content: shortened(text) })] : [];
   });
-  return [...earlier, ...messages.slice(start)];
+  return [...said.slice(-earlier), ...messages.slice(start)];
+}
+
+/** The manager's words for a thanks or a hello, which need no model. */
+const COURTESY = {
+  thanks: "You're welcome. Ask me anything about the tour whenever you need.",
+  hello: "Hi! Ask me about this tour's route, venues, sponsors or fans, or for a change to it.",
+};
+/** A tool answer's words for the manager about what was shown, which the user's copy of the answer leaves out. */
+const SHOWN = /\n\n\[Shown to the user below the reply: [^\]]*\.\]$/;
+/** What the team made this turn, in a line under the reply. */
+function madeLine(made: Desk["made"]) {
+  const kinds = made.map((m) => m.card.kind);
+  const drafts = kinds.filter((k) => k === "draft").length;
+  return [kinds.includes("change") ? "The change is ready to apply below." : "", drafts ? (drafts > 1 ? `The ${drafts} drafts are below, to edit and send.` : "The draft is below, to edit and send.") : ""].filter(Boolean).join(" ");
 }
 
 const describe = (card: ManagerCard) =>
@@ -127,6 +147,17 @@ export function managerGraph(desk: Desk, models: Models, checkpointer?: BaseChec
 
   const manage = async (s: State) => {
     const turn = thisTurn(s.messages);
+    // A thanks or a hello, and nothing else yet: no model needed.
+    const courtesy = turn.length === 1 ? courtesyOf(textOf(turn[0])) : undefined;
+    if (courtesy) return { messages: [new AIMessage(COURTESY[courtesy])] };
+    // The work went to specialists alone, and each answered: their answers, written for the user, are the reply, so the
+    // manager isn't called again only to say them in other words. Its own tools (a "no" remembered) still get a reply.
+    const handed = callsOf(turn.findLast((m) => isAIMessage(m)));
+    const answers = handed.map((c) => turn.find((m) => isToolMessage(m) && m.tool_call_id === c.id) as ToolMessage | undefined);
+    if (handed.length && handed.every((c) => agentOf(c.name)) && answers.every((a) => a && a.status !== "error")) {
+      const said = answers.map((a) => textOf(a).replace(SHOWN, "").trim()).filter(Boolean);
+      return { messages: [new AIMessage([...said, madeLine(desk.made)].filter(Boolean).join("\n\n"))] };
+    }
     const asked = turn.filter((m) => isToolMessage(m) && agentOf(m.name ?? "")).length;
     const rounds = turn.filter((m) => callsOf(m).length).length;
     const last = asked >= LIMITS.asks || rounds >= LIMITS.rounds;

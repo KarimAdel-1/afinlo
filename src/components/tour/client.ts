@@ -36,8 +36,8 @@ export async function streamPlan(input: PlanInput & { parentId?: string }, onSta
 }
 
 /** A message to the assistant on Home, reporting what it does as it happens. Resolves with the reply and the tours it made. */
-export async function streamAssistant(message: string, onEvent: (e: AssistantEvent) => void): Promise<{ reply: string; cards: AssistantCard[] }> {
-  const res = await fetch("/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+export async function streamAssistant(chat: string, message: string, onEvent: (e: AssistantEvent) => void): Promise<{ reply: string; cards: AssistantCard[] }> {
+  const res = await fetch("/api/assistant", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, chat }) });
   if (res.headers.get("content-type")?.includes("application/json")) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error || "The assistant couldn't answer. Please try again.");
   if (!res.ok || !res.body) throw new Error("The assistant couldn't start. Please try again.");
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();

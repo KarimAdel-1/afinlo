@@ -46,14 +46,14 @@ export function cellBox(lat: number, lon: number, grid: HeatGrid): [number, numb
 /** A cell's density on both maps: its strength (0–1) squared, so most of the map stays clear and colour gathers where the fans are. */
 export const cellDensity = (w: number) => w * w;
 
-/** Density to colour, from clear to hot, as [density, [red, green, blue, alpha]]. */
+/** Density to colour, from clear to hot, as [density, [red, green, blue, alpha]]: the landing page's blue, light to deep. */
 export const HEAT_RAMP: [number, [number, number, number, number]][] = [
   [0, [143, 134, 255, 0]],
   [0.12, [143, 134, 255, 0.32]],
   [0.35, [98, 86, 255, 0.5]],
-  [0.6, [67, 54, 255, 0.62]],
-  [0.82, [190, 70, 220, 0.7]],
-  [1, [255, 79, 126, 0.82]],
+  [0.6, [67, 54, 255, 0.64]],
+  [0.82, [47, 34, 230, 0.74]],
+  [1, [30, 23, 168, 0.86]],
 ];
 
 /** The ramp's colour at a density, as the live map blends it. */

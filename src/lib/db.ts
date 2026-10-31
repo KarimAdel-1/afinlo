@@ -37,6 +37,10 @@ const TABLES = [
      visitor TEXT NOT NULL, act_id TEXT NOT NULL, act TEXT NOT NULL, prefs TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (visitor, act_id)
    )`,
   `CREATE TABLE IF NOT EXISTS tour_profiles (visitor TEXT PRIMARY KEY, profile TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+  // A browser's conversations with the assistant on Home: each its own LangGraph thread (src/platform/assistant/chat.ts).
+  `CREATE TABLE IF NOT EXISTS tour_assistant_chats (
+     visitor TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (visitor, id)
+   )`,
   // What each request spent on the model, one row per role it used (src/platform/manager/usage.ts).
   `CREATE TABLE IF NOT EXISTS tour_model_usage (
      at TEXT NOT NULL, surface TEXT NOT NULL, visitor TEXT, role TEXT NOT NULL, model TEXT NOT NULL,

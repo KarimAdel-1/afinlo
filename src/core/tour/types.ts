@@ -349,6 +349,13 @@ export interface AssistantMessage {
   text: string;
   cards?: AssistantCard[];
 }
+/** One of a browser's conversations with the assistant, as its history lists it. */
+export interface AssistantChatSummary {
+  id: string;
+  /** The conversation's first message, shortened. */
+  title: string;
+  updatedAt: string;
+}
 /** What the assistant is doing, as it happens. */
 export type AssistantEvent = { kind: "tool"; label: string };
 

@@ -10,8 +10,12 @@ import { MODELS } from "../tour/model";
 import type { Models, Role } from "./graph";
 import type { Usage } from "./usage";
 
-/** The most each role writes in one call, its reasoning included. */
-const MAX_TOKENS: Record<Role, number> = { manager: 1500, route: 2000, venues: 2000, sponsors: 4000, promoter: 3000, summary: 600, assistant: 2500 };
+/**
+ * The most each role writes in one call, its reasoning included: room for its longest proper answer (the manager routes
+ * in a few lines; a sponsor pitch is under 170 words; the promoter writes up to three posts) and little more, so a call
+ * that rambles is cut off rather than billed.
+ */
+const MAX_TOKENS: Record<Role, number> = { manager: 800, route: 1200, venues: 1200, sponsors: 2000, promoter: 2000, summary: 400, assistant: 1500 };
 
 
 export function openAiModels(onUsage?: (role: Role, usage: Usage) => void): Models {

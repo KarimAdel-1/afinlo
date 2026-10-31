@@ -6,6 +6,7 @@ import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { AIMessage, isAIMessage, isHumanMessage, isToolMessage, RemoveMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { withoutUnsupportedClaims } from "@/core/tour/claims";
+import { courtesyOf } from "@/core/tour/courtesy";
 import type { AssistantCard } from "@/core/tour/types";
 import { contextOf, textOf, thisTurn } from "../manager/graph";
 import { data, DATA_RULE } from "../tour/model";
@@ -14,8 +15,8 @@ import { assistantTools, type AssistantDesk } from "./tools";
 export const ASSISTANT_LIMITS = {
   /** Model calls for one message; the last answers without tools. */
   steps: 6,
-  /** Turns of the conversation the model sees, the latest. */
-  keep: 12,
+  /** Earlier messages the model reads again, the latest, as what was said (contextOf); the profile keeps the rest. */
+  earlier: 6,
 };
 
 export const AssistantState = Annotation.Root({
@@ -62,11 +63,15 @@ export function assistantGraph(desk: AssistantDesk, model: BaseChatModel, checkp
   };
 
   const think = async (s: State) => {
+    // A thanks or a hello, and nothing else yet: no model needed.
+    const turn = thisTurn(s.messages);
+    const courtesy = turn.length === 1 ? courtesyOf(textOf(turn[0])) : undefined;
+    if (courtesy) {
+      const first = desk.profile.name?.trim().split(/\s+/)[0];
+      return { messages: [new AIMessage(courtesy === "thanks" ? "You're welcome! I'm here whenever you want to plan the next step." : `Hi${first ? ` ${first}` : ""}! Tell me about your act, or ask me to plan a tour.`)] };
+    }
     const last = thisTurn(s.messages).filter((m) => isAIMessage(m)).length >= ASSISTANT_LIMITS.steps - 1;
-    // The latest turns only, cut where a turn starts, so no tool call is parted from its answer; of the earlier ones,
-    // only what was said (contextOf).
-    const starts = s.messages.flatMap((m, i) => (isHumanMessage(m) ? [i] : []));
-    const recent = contextOf(s.messages.slice(starts.length > ASSISTANT_LIMITS.keep ? starts[starts.length - ASSISTANT_LIMITS.keep] : 0));
+    const recent = contextOf(s.messages, ASSISTANT_LIMITS.earlier);
     const prompt = assistantPrompt(desk);
     const system = new SystemMessage(last ? `${prompt}\n\nYou've done all the lookups this message allows: answer now from what you found.` : prompt);
     return { messages: [await (last ? answer : free).invoke([system, ...recent], { signal: desk.signal })] };

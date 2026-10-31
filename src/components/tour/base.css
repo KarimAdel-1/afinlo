@@ -1,5 +1,6 @@
-/* The app's shared styles, in Afinlo's design system: canvas and paper surfaces, Afinlo blue for heat and actions,
-   the lime accent for hidden markets, Wix Madefor Display for headings and numbers, generous radii and space. */
+/* The app's shared styles, in the landing page's design system: its gray canvas and white paper, its blue for heat and
+   actions, its ink for text, its lavender tint for hidden markets, Wix Madefor Display for headings and numbers,
+   generous radii and space. */
 .hl {
   --hl-canvas: #eeeef0;
   --hl-paper: #ffffff;
@@ -11,11 +12,13 @@
   --hl-blue: #4336ff;
   --hl-blue-ink: #2f22e6;
   --hl-lavender: #e4e3f8;
-  --hl-lime: #efff8a;
-  --hl-lime-ink: #3f4a00;
-  --hl-pink: #ff4f7e;
-  --hl-good: #1f8a5b;
-  --hl-warn: #9a6200;
+  /* Nothing beyond the landing page's palette: its blue for what's active, strong or done, its ink, its grays, and its
+     lavender tint for what's highlighted. Red is kept for errors alone. */
+  --hl-tint: #e0ddfa;
+  --hl-tint-ink: #2f22e6;
+  --hl-strong: #262a3f;
+  --hl-good: #2f22e6;
+  --hl-warn: #565967;
   color: var(--hl-ink);
   font-family: var(--font-body), sans-serif;
 }
@@ -124,13 +127,13 @@
   color: #3125d6;
 }
 .hl-chip-good {
-  background: #e6f6ee;
-  border-color: #c9ebd9;
+  background: #efeeff;
+  border-color: #d2cff5;
   color: var(--hl-good);
 }
 .hl-chip-warn {
-  background: #fff4dc;
-  border-color: #f6e2b0;
+  background: #f1f1f4;
+  border-color: #dfdfe5;
   color: var(--hl-warn);
 }
 .hl-tile {
@@ -191,9 +194,9 @@
   align-items: flex-start;
   padding: 14px 18px;
   border-radius: 18px;
-  background: #fff8e8;
-  border: 1px solid #f3e1b3;
-  color: #6b4c00;
+  background: #f6f6f9;
+  border: 1px solid #dfdfe5;
+  color: #3d4062;
   font-size: 14px;
   line-height: 1.55;
 }
@@ -234,7 +237,7 @@
   fill: #4f3cff;
 }
 .hl-hex-6 {
-  fill: var(--hl-pink);
+  fill: var(--hl-strong);
 }
 .hl-stop circle {
   fill: var(--hl-ink);
@@ -269,7 +272,7 @@
 }
 .hl-stop.lime.on circle,
 .hl-stop.lime[role="button"]:focus-visible circle {
-  fill: var(--hl-lime);
+  fill: var(--hl-tint);
 }
 
 /* Home: the hero's search bar and the map card */
@@ -565,11 +568,11 @@
   white-space: nowrap;
 }
 .hl-mini.lime {
-  background: var(--hl-lime);
-  color: var(--hl-lime-ink);
+  background: var(--hl-tint);
+  color: var(--hl-tint-ink);
 }
 .hl-mini.low {
-  background: #fff4dc;
+  background: #f1f1f4;
   color: var(--hl-warn);
 }
 .hl-bar {
@@ -586,7 +589,7 @@
   background: var(--hl-blue);
 }
 .hl-bar.lime span {
-  background: #b7cc00;
+  background: var(--hl-blue);
 }
 .hl-tags {
   display: flex;
@@ -839,7 +842,7 @@
 }
 .hl-pipe.code > span {
   background: rgba(255, 255, 255, 0.12);
-  color: var(--hl-lime);
+  color: var(--hl-tint);
 }
 .hl-pipe.code p {
   color: #c9cadb;
@@ -943,8 +946,8 @@
   color: #dcd9ff;
 }
 .hl-proof.lime {
-  background: #f9ffd6;
-  border-color: #e9f5a4;
+  background: #efeeff;
+  border-color: #d2cff5;
 }
 .hl-minimaps {
   display: grid;
@@ -1026,8 +1029,8 @@
   margin-top: 20px;
   padding: 28px;
   border-radius: 28px;
-  background: #fff8e8;
-  border: 1px solid #f3e1b3;
+  background: #f6f6f9;
+  border: 1px solid #dfdfe5;
 }
 .hl-pending svg {
   flex-shrink: 0;
@@ -1040,7 +1043,7 @@
 .hl-pending p {
   margin-top: 6px;
   font-size: 15px;
-  color: #6b4c00;
+  color: #3d4062;
 }
 .hl-result-table {
   margin-top: 20px;
@@ -1212,8 +1215,8 @@
     transform 0.5s cubic-bezier(0.22, 1.4, 0.36, 1);
 }
 .hl-loop-pin.lime {
-  background: #efff8a;
-  color: #3f4a00;
+  background: var(--hl-tint);
+  color: var(--hl-tint-ink);
 }
 .hl-loop-pin.on {
   opacity: 1;
@@ -1371,8 +1374,8 @@
   background: var(--hl-ink);
 }
 .hl-how-number.lime {
-  background: #efff8a;
-  color: #3f4a00;
+  background: var(--hl-tint);
+  color: var(--hl-tint-ink);
 }
 /* Book the venues */
 .hl-how-head {
@@ -1444,8 +1447,8 @@
   color: var(--hl-blue-ink);
 }
 .hl-how-list em.s-2 {
-  background: #efff8a;
-  color: #3f4a00;
+  background: var(--hl-tint);
+  color: var(--hl-tint-ink);
 }
 .hl-how-list em.s-3 {
   background: var(--hl-ink);

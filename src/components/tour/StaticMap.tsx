@@ -106,9 +106,9 @@ export function StaticMap({
         const [x, y] = at(s.lon, s.lat);
         return (
           <g key={i} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}>
-            <circle r={numbered ? 10.5 : 5} fill={s.hidden ? "#efff8a" : "#262a3f"} stroke="#fff" strokeWidth={2.5} />
+            <circle r={numbered ? 10.5 : 5} fill={s.hidden ? "#e0ddfa" : "#262a3f"} stroke="#fff" strokeWidth={2.5} />
             {numbered && (
-              <text textAnchor="middle" dy="0.36em" fontSize={10.5} fontWeight={700} fill={s.hidden ? "#3f4a00" : "#fff"} fontFamily="var(--font-display), sans-serif">
+              <text textAnchor="middle" dy="0.36em" fontSize={10.5} fontWeight={700} fill="#fff" fontFamily="var(--font-display), sans-serif">
                 {i + 1}
               </text>
             )}

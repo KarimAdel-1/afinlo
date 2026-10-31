@@ -2,6 +2,7 @@
 // status, remember a "no", propose a change, save a draft). This is how the agents see the tour: every city, brand,
 // venue and number they name comes from one of these answers, which reach the model as fenced data. A change to the
 // tour is only ever a proposal: the user applies it, and the planner makes a new version.
+import { compactResult } from "@/core/tour/compact";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import { COUNTRY_NAMES, placeOf, REGIONS, where as whereSchema, whereLabel, type Where } from "@/core/tour/regions";
@@ -53,7 +54,7 @@ function make<S extends z.ZodObject>(
       desk.emit({ kind: "tool", agent, label: def.label(input) });
       try {
         const out = await def.run(input);
-        return data(`afinlo:${def.name}`, typeof out === "string" ? out : JSON.stringify(out));
+        return data(`afinlo:${def.name}`, compactResult(out));
       } catch (error) {
         if (desk.signal.aborted) throw error;
         return `That didn't work: ${error instanceof TourError ? error.message : "the lookup failed. Try once more, or answer without it."}`;
@@ -299,7 +300,7 @@ function venueTools(desk: Desk): Tool[] {
         const guide = await guideFor(desk, c.id);
         return {
           city: placeOf(c),
-          venues: guide.venues.map((v) => ({ venue: v.name, id: v.id, kind: v.kind, address: v.address, rating: v.rating, fansAffinity: v.affinity, status: VENUE_LABELS[(statusOf(desk, "venue", v.id)?.status ?? "to_contact") as VenueStatus] })),
+          venues: guide.venues.map((v) => ({ venue: v.name, kind: v.kind, address: v.address, rating: v.rating, fansAffinity: v.affinity, status: VENUE_LABELS[(statusOf(desk, "venue", v.id)?.status ?? "to_contact") as VenueStatus] })),
           notes: guide.notes,
         };
       },
@@ -341,9 +342,9 @@ function sponsorTools(desk: Desk): Tool[] {
       run: ({ category }) =>
         p.sponsors
           .filter((s) => !category || s.brand.categories.some((t) => t.startsWith(tagOf(category))))
+          // No IDs: the tools find a brand by its name, and an ID costs the model a dozen tokens a line.
           .map((s) => ({
             brand: s.brand.name,
-            id: s.brand.id,
             sponsorFit: s.fit,
             qlooRank: s.qlooRank,
             size: s.tier,
@@ -363,7 +364,7 @@ function sponsorTools(desk: Desk): Tool[] {
         const avoid = [...(p.request.avoid ?? []), ...(desk.memory?.avoid ?? [])].map(tagOf);
         const scored = scoreSponsors(found, { categoryTags: [tagOf(category)], avoidTags: avoid, excludeBrandIds: [...no], basis: p.signal.basis === "act" ? "act" : "similar" }).slice(0, 8);
         for (const s of scored) desk.found.set(s.brand.id, { id: s.brand.id, name: s.brand.name, fit: s.fit, tier: s.tier });
-        return scored.length ? scored.map((s) => ({ brand: s.brand.name, id: s.brand.id, sponsorFit: s.fit, size: s.tier })) : `Qloo found no more ${SPONSOR_CATEGORIES[category].label.toLowerCase()} brands for these fans.`;
+        return scored.length ? scored.map((s) => ({ brand: s.brand.name, sponsorFit: s.fit, size: s.tier })) : `Qloo found no more ${SPONSOR_CATEGORIES[category].label.toLowerCase()} brands for these fans.`;
       },
     }),
     make(desk, "sponsors", {

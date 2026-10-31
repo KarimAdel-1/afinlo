@@ -14,7 +14,7 @@ import type { AssistantEvent } from "@/core/tour/types";
 import { savedResults } from "../tour/saved";
 import { getPlan } from "../tour/store";
 import { templatePitch } from "../tour/writer";
-import { askAssistant, assistantHistory } from "./chat";
+import { askAssistant, assistantChats, assistantHistory, deleteAssistantChat } from "./chat";
 import { getProfile } from "./profile";
 
 testDatabase();
@@ -38,7 +38,7 @@ test("the assistant learns about the user, finds the act and plans the tour, whi
   ]);
   const events: AssistantEvent[] = [];
   const out = await askAssistant(
-    { browser, visitor: `v:${browser}`, message: "I'm Fixture Star from Nashville. Plan my first tour.", signal: AbortSignal.timeout(30_000), emit: (e) => events.push(e) },
+    { browser, visitor: `v:${browser}`, chat: "chat-one", message: "I'm Fixture Star from Nashville. Plan my first tour.", signal: AbortSignal.timeout(30_000), emit: (e) => events.push(e) },
     { model, checkpointer: saver, client: fixtureQloo(), writer },
   );
   assert.equal(out.reply, "Your 4-show tour is ready below.");
@@ -50,7 +50,7 @@ test("the assistant learns about the user, finds the act and plans the tour, whi
   assert.deepEqual([(await getProfile(browser)).basedIn, (await getProfile(browser)).goals], ["Nashville", ["a first headline tour"]], "what they said is remembered");
   assert.ok(events.some((e) => /Scoring the cities/.test(e.label)), "the plan's stages are shown as it's made");
   // The system prompt carries what's known; the conversation and its card are kept.
-  const history = await assistantHistory(browser, { checkpointer: saver });
+  const history = await assistantHistory(browser, "chat-one", { checkpointer: saver });
   assert.deepEqual(history.map((m) => m.role), ["user", "assistant"]);
   assert.equal(history[1].cards?.[0].planId, card.planId);
 
@@ -60,7 +60,15 @@ test("the assistant learns about the user, finds the act and plans the tour, whi
       return "Hello again.";
     },
   ]);
-  await askAssistant({ browser, visitor: `v:${browser}`, message: "Hi", signal: AbortSignal.timeout(30_000) }, { model: next, checkpointer: saver, client: fixtureQloo(), writer });
+  await askAssistant({ browser, visitor: `v:${browser}`, chat: "chat-two", message: "Hi, what can you do?", signal: AbortSignal.timeout(30_000) }, { model: next, checkpointer: saver, client: fixtureQloo(), writer });
+  // A thanks needs no model: a scripted model with nothing to say would fail if asked.
+  const thanks = await askAssistant({ browser, visitor: `v:${browser}`, chat: "chat-two", message: "Thanks!", signal: AbortSignal.timeout(30_000) }, { model: new ScriptedModel([]), checkpointer: saver, client: fixtureQloo(), writer });
+  assert.match(thanks.reply, /You're welcome/);
+  // Each chat is its own conversation, listed newest first under its first message; a deleted one goes.
+  assert.deepEqual((await assistantHistory(browser, "chat-two", { checkpointer: saver })).map((m) => m.text), ["Hi, what can you do?", "Hello again.", "Thanks!", thanks.reply]);
+  assert.deepEqual((await assistantChats(browser, { checkpointer: saver })).map((c) => [c.id, c.title]), [["chat-two", "Hi, what can you do?"], ["chat-one", "I'm Fixture Star from Nashville. Plan my first tour."]]);
+  await deleteAssistantChat(browser, "chat-two");
+  assert.deepEqual((await assistantChats(browser, { checkpointer: saver })).map((c) => c.id), ["chat-one"]);
 });
 
 test("a new artist Qloo doesn't know is planned from the acts they sound like, and an unknown area is a clear answer", async () => {
@@ -73,7 +81,7 @@ test("a new artist Qloo doesn't know is planned from the acts they sound like, a
     },
     "Planned from the acts you sound like.",
   ]);
-  const out = await askAssistant({ browser, visitor: `v:${browser}`, message: "I'm new. Plan a tour.", signal: AbortSignal.timeout(30_000) }, { model, checkpointer: new MemorySaver(), client: fixtureQloo(), writer });
+  const out = await askAssistant({ browser, visitor: `v:${browser}`, chat: "chat-new", message: "I'm new. Plan a tour.", signal: AbortSignal.timeout(30_000) }, { model, checkpointer: new MemorySaver(), client: fixtureQloo(), writer });
   const plan = (await getPlan(out.cards[0].planId))!;
   try {
     assert.equal(plan.act.name, "The Unsigned");

@@ -44,7 +44,7 @@ const tourLine = (plan: Plan) => `${plan.act.name} (${plan.act.comedian ? "a com
 
 /** A specialist's system prompt: who it is, its job, and the rules. */
 export function specialistPrompt(agent: Specialist, plan: Plan) {
-  return `You are the ${SPECIALIST_LABELS[agent].toLowerCase()} on Afinlo's tour team, working on ${tourLine(plan)}. The tour manager gives you a task; do it with your tools and answer the manager. ${TEAM[agent].prompt} ${RULES}`;
+  return `You are the ${SPECIALIST_LABELS[agent].toLowerCase()} on Afinlo's tour team, working on ${tourLine(plan)}. The tour manager gives you a task from the user's message; do it with your tools. Your answer goes to the user as it is: write it to them, and don't mention the manager or the team. ${TEAM[agent].prompt} ${RULES}`;
 }
 
 /** The manager's system prompt: the team, how to use it, the tour at a glance, and the conversation so far. */
@@ -59,7 +59,7 @@ export function managerPrompt(plan: Plan, summary: string) {
   return [
     `You are the tour manager on Afinlo's tour team, talking with the user about ${tourLine(plan)}. Your specialists do the work, each with its own tools on the tour's Qloo data: ${(Object.keys(TEAM) as Specialist[]).map((a) => TEAM[a].does).join(" ")}`,
     "For anything about the tour's cities, venues, sponsors or fans, hand the work to the right specialist with a clear task that stands on its own: they don't see this conversation, so say who and what, with names. Ask several at once when the message needs several. Don't answer facts about the tour yourself.",
-    "Then reply to the user from what they found, plainly and briefly, keeping their names and numbers exactly. Don't add facts they didn't give. If one proposed a change, say it's ready to apply below the reply; if one saved a draft, say it's below.",
+    "Their answers go to the user as they are. When you use your own tools too, reply from what they found, plainly and briefly, keeping their names and numbers exactly, and don't add facts they didn't give.",
     "When the user says the act won't work with a brand, a sponsor category or a city, call remember_no so its next tours leave it out, and ask the route planner or sponsor scout whether this tour should change too.",
     "For greetings or questions about Afinlo itself, answer briefly without the team.",
     RULES,

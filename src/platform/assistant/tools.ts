@@ -2,6 +2,7 @@
 // planning a tour, and the user's tours with what each needs next. Every answer reaches the model as fenced data; an
 // error comes back as text it can act on. Planning a tour is the same agent the brief runs (planTour), with the same
 // limits, and the tour opens as a full workspace.
+import { compactResult } from "@/core/tour/compact";
 import { tool, type StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import { TasteError } from "@/core/taste/types";
@@ -64,7 +65,7 @@ function make<S extends z.ZodObject>(desk: AssistantDesk, def: { name: string; d
       desk.emit({ kind: "tool", label: def.label(input) });
       try {
         const out = await def.run(input);
-        return data(`afinlo:${def.name}`, typeof out === "string" ? out : JSON.stringify(out));
+        return data(`afinlo:${def.name}`, compactResult(out));
       } catch (error) {
         if (desk.signal.aborted) throw error;
         return `That didn't work: ${error instanceof TourError || error instanceof TasteError ? error.message : "the lookup failed. Try once more, or answer without it."}`;

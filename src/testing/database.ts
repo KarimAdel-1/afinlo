@@ -13,7 +13,7 @@ export const testBrowser = () => `test-${Math.random().toString(36).slice(2)}`;
 export function testDatabase() {
   if (!process.env.DATABASE_URL && existsSync(".env.local")) process.loadEnvFile(".env.local");
   after(async () => {
-    for (const table of ["tour_saved", "tour_statuses", "tour_acts", "tour_chat_usage", "tour_profiles", "tour_model_usage"]) await db().prepare(`DELETE FROM ${table} WHERE visitor LIKE 'test-%'`).run();
+    for (const table of ["tour_saved", "tour_statuses", "tour_acts", "tour_chat_usage", "tour_profiles", "tour_model_usage", "tour_assistant_chats"]) await db().prepare(`DELETE FROM ${table} WHERE visitor LIKE 'test-%'`).run();
     await db().prepare("DELETE FROM tour_usage WHERE visitor LIKE 'v:test-%'").run();
     await db().prepare("DELETE FROM tour_city_guides WHERE plan_id LIKE 'pl_test_%'").run();
     await db().prepare("DELETE FROM tour_plans WHERE act_id = ?").run(FIXTURE_ACT_ID);

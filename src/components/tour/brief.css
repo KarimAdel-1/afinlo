@@ -168,7 +168,7 @@
   display: block;
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #8f86ff, var(--hl-blue), #ff4f7e);
+  background: linear-gradient(90deg, #8f86ff, var(--hl-blue), #1e17a8);
 }
 .hl-countries {
   margin-top: 14px;
@@ -293,9 +293,9 @@
   font-size: 13px;
 }
 .hl-cats.avoid button[aria-pressed="true"] {
-  border-color: #f3b5c5;
-  background: #ffe4ec;
-  color: #b0163f;
+  border-color: var(--hl-ink);
+  background: var(--hl-ink);
+  color: #fff;
 }
 .hl-memory {
   display: flex;

@@ -339,7 +339,7 @@
   background: linear-gradient(90deg, #8f86ff, var(--hl-blue));
 }
 .hl-heat.lime .hl-heat-bar span {
-  background: linear-gradient(90deg, #dbe86a, #b8cc1f);
+  background: linear-gradient(90deg, #8f86ff, #4336ff);
 }
 .hl-heat b {
   width: 24px;
@@ -395,8 +395,8 @@
   font-weight: 700;
 }
 .hl-stop-n.lime {
-  background: var(--hl-lime);
-  color: var(--hl-lime-ink);
+  background: var(--hl-tint);
+  color: var(--hl-tint-ink);
 }
 .hl-stop-n.small {
   width: 22px;
@@ -502,7 +502,7 @@
   background: #c9c5ff;
 }
 .hl-dot.s-hold {
-  background: #ffb547;
+  background: #4336ff;
 }
 .hl-dot.s-confirmed {
   background: var(--hl-good);
@@ -537,12 +537,12 @@
   border-radius: 16px;
 }
 .hl-venue.s-confirmed {
-  border-color: #b9e2cd;
-  background: #f4fbf7;
+  border-color: #d2cff5;
+  background: #f4f3ff;
 }
 .hl-venue.s-hold {
-  border-color: #f6d8a6;
-  background: #fffaf1;
+  border-color: #dfdfe5;
+  background: #f9f9fa;
 }
 .hl-venue.s-passed {
   opacity: 0.6;
@@ -580,7 +580,7 @@
   align-items: center;
   gap: 3px;
   margin-left: 8px;
-  color: #9a6200;
+  color: var(--hl-warn);
   font-weight: 600;
 }
 .hl-venue-links {
@@ -611,15 +611,15 @@
 }
 .hl-status-pill.s-hold,
 .hl-status-pill.s-replied {
-  border-color: #f6d8a6;
-  background-color: #fff3dd;
-  color: #8a5300;
+  border-color: #dfdfe5;
+  background-color: #f1f1f4;
+  color: #3d4062;
 }
 .hl-status-pill.s-confirmed,
 .hl-status-pill.s-signed {
-  border-color: #b9e2cd;
-  background-color: #e9f8ef;
-  color: #0b6b41;
+  border-color: #d2cff5;
+  background-color: #efeeff;
+  color: var(--hl-blue-ink);
 }
 .hl-status-pill.s-passed {
   color: var(--hl-subtle);
@@ -656,7 +656,7 @@
   background: #fff;
 }
 .hl-pitch-card.s-signed {
-  border-color: #b9e2cd;
+  border-color: #d2cff5;
 }
 .hl-pitch-card.s-passed {
   opacity: 0.6;
@@ -784,7 +784,7 @@
   background: var(--hl-blue);
 }
 .hl-meter.lime span {
-  background: #b8cc1f;
+  background: #4336ff;
 }
 .hl-tasks {
   display: grid;
@@ -808,8 +808,8 @@
   box-shadow: 0 10px 24px -18px rgba(67, 54, 255, 0.6);
 }
 .hl-tasks li.late .hl-task-icon {
-  background: #fff3dd;
-  color: #8a5300;
+  background: #f1f1f4;
+  color: #3d4062;
 }
 .hl-task-text {
   display: grid;
@@ -895,8 +895,8 @@
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .hl-pin.lime {
-  background: var(--hl-lime);
-  color: var(--hl-lime-ink);
+  background: var(--hl-tint);
+  color: var(--hl-tint-ink);
 }
 .hl-pin.on,
 .hl-pin:hover {
@@ -914,13 +914,13 @@
   width: 16px;
   height: 16px;
   border-width: 3px;
-  background: var(--hl-pink);
+  background: var(--hl-strong);
   cursor: default;
 }
 .hl-pin.spot.on,
 .hl-pin.spot:hover {
   transform: scale(1.45);
-  box-shadow: 0 0 0 5px rgb(255 79 126 / 0.25), 0 6px 14px -4px rgba(23, 22, 40, 0.5);
+  box-shadow: 0 0 0 5px rgb(38 42 63 / 0.25), 0 6px 14px -4px rgba(23, 22, 40, 0.5);
 }
 .hl-pin.mini {
   display: inline-grid;
@@ -967,7 +967,7 @@
   width: 64px;
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(90deg, rgba(143, 134, 255, 0.35), #4336ff, #be46dc, #ff4f7e);
+  background: linear-gradient(90deg, rgba(143, 134, 255, 0.35), #4336ff, #3023df, #1e17a8);
 }
 .hl-map-key-sep {
   width: 1px;

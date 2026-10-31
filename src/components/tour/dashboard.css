@@ -94,30 +94,14 @@
 .hl-dock-icon.blue {
   background: linear-gradient(160deg, #7a72ff 0%, #4336ff 52%, #2b1fd9 100%);
 }
-.hl-dock-icon.orange {
-  background: linear-gradient(160deg, #ffad8a 0%, #ff7a45 55%, #ef5a2b 100%);
-}
-.hl-dock-icon.pink {
-  background: linear-gradient(160deg, #ff8eab 0%, #ff4f7e 55%, #e5305f 100%);
-}
-.hl-dock-icon.violet {
-  background: linear-gradient(160deg, #b08cf0 0%, #7d4fc9 60%, #6237ad 100%);
-}
 .hl-dock-icon.ink {
   background: linear-gradient(160deg, #50577b 0%, #262a3f 72%);
-}
-.hl-dock-icon.teal {
-  background: linear-gradient(160deg, #46bcd1 0%, #0e7490 65%, #0a5a70 100%);
-}
-.hl-dock-icon.lime {
-  background: linear-gradient(160deg, #fbffd6 0%, #efff8a 50%, #d6eb40 100%);
-  color: #3f4a00;
 }
 .hl-dock-icon.lavender {
   background: linear-gradient(160deg, #ffffff 0%, #e4e3f8 60%, #d2cff5 100%);
   color: #4336ff;
 }
-.hl-dock-icon:is(.lime, .lavender, .white) svg {
+.hl-dock-icon:is(.lavender, .white) svg {
   filter: none;
 }
 /* The open page's dot, at the screen-edge side of its icon, as on a Mac dock at the left. */
