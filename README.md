@@ -13,6 +13,12 @@ Afinlo is an AI tour manager that knows your fans. Tell it which artist or comed
 - **Try first:** the example tours on Home: *Khruangbin* in Europe, *Bad Bunny* in Latin America, *Wegz* in the Middle East and North Africa, *Morgan Wallen* and *Taylor Tomlinson* in North America, *Glass Beams* in Australia and the Pacific. Then plan one for an act you know.
 - Built for the [Qloo Agentic Hackathon](https://qloo.devpost.com) · Apache 2.0
 
+![The Afinlo landing page](docs/screenshots/hero.png)
+
+| Home | New tour | Acts |
+|---|---|---|
+| ![Home: the assistant](docs/screenshots/home.png) | ![New tour: find the act, with the world map](docs/screenshots/new-tour.png) | ![Acts: each act and what Afinlo remembers](docs/screenshots/acts.png) |
+
 ## The problem
 
 Independent musicians and comedians pick tour cities by instinct and pitch the same famous brands as everyone else. Ask a general chatbot and it tends to suggest the biggest cities and the best-known brands, because it has no data on where a particular act's audience actually is. Afinlo uses Qloo's taste data to find the cities where *this* act's fans over-index, the venues and brands *these* fans love, and turns that into a tour a manager can book, fund and promote.

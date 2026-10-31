@@ -524,12 +524,6 @@
   line-height: 1.5;
   resize: none;
 }
-.hl-assist-input textarea:focus-visible {
-  outline: none;
-}
-.hl-assist-box:focus-within {
-  border-color: #c9c5ff;
-}
 .hl-assist-box-foot {
   display: flex;
   flex-wrap: wrap;

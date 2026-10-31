@@ -1162,11 +1162,6 @@
   background: var(--hl-soft);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.hl-dialog-body :is(input, textarea):focus {
-  border-color: var(--hl-blue);
-  box-shadow: 0 0 0 3px rgb(67 54 255 / 0.15);
 }
 .hl-dialog-body textarea {
   min-height: 260px;
@@ -1388,9 +1383,6 @@
   border-radius: 21px;
   background: #fff;
 }
-.hl-team-ask:focus-within {
-  border-color: var(--hl-blue);
-}
 .hl-team-ask textarea {
   flex: 1;
   align-self: center;
@@ -1403,9 +1395,6 @@
   font: inherit;
   font-size: 15px;
   resize: none;
-}
-.hl-team-ask textarea:focus-visible {
-  outline: none;
 }
 .hl-team-ask .hl-button {
   flex-shrink: 0;

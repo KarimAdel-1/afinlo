@@ -46,9 +46,12 @@
   padding: 0;
   list-style: none;
 }
-.hl :is(button, input, select, textarea, a):focus-visible {
+.hl :is(button, a, input:is([type="checkbox"], [type="radio"], [type="range"])):focus-visible {
   outline: 3px solid #8f86ff;
   outline-offset: 3px;
+}
+.hl :is(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea):focus-visible {
+  outline: none;
 }
 :where(.hl) button {
   cursor: pointer;
@@ -319,9 +322,7 @@
   border: 1.5px solid var(--hl-line);
 }
 .hl-big-search:focus-within {
-  border-color: var(--hl-blue);
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(67, 54, 255, 0.12);
 }
 .hl-big-search > svg {
   color: var(--hl-subtle);
@@ -336,9 +337,6 @@
   font-size: 20px;
   padding: 12px 0;
   color: var(--hl-ink);
-}
-.hl-big-search input:focus-visible {
-  outline: none;
 }
 .hl-results {
   display: grid;
@@ -1295,13 +1293,6 @@
   border-radius: 100px;
   background: #fff;
   color: var(--hl-subtle);
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-.hl-how-field.on {
-  border-color: var(--hl-blue);
-  box-shadow: 0 0 0 4px rgba(67, 54, 255, 0.12);
 }
 .hl-how-field > svg {
   flex-shrink: 0;
