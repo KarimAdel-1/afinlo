@@ -849,7 +849,9 @@
   border-radius: 22px;
   background: #eceef4;
 }
-.hl-tourmap-canvas {
+/* Two classes, so MapLibre's own .maplibregl-map rule doesn't win when its stylesheet loads later (after a client
+   navigation), which would leave the canvas no height. */
+.hl-tourmap .hl-tourmap-canvas {
   position: absolute;
   inset: 0;
 }
